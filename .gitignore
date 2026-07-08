@@ -1,0 +1,23 @@
+# --- Public/private boundary: real data NEVER lives in this repo. ---
+# Real daily outputs belong in the separate private leaps-hunter-data repo.
+# This ignore block is defense-in-depth, not the boundary itself.
+data/
+*.private.*
+smoke-test*.txt
+
+# Secrets — nothing here should ever need one, but belt and suspenders
+.env
+.env.*
+*.pem
+*.key
+
+# macOS
+.DS_Store
+
+# Node / build output (dashboard app)
+node_modules/
+dist/
+*.local
+
+# Claude Code local settings
+.claude/settings.local.json
