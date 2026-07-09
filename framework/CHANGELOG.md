@@ -19,7 +19,7 @@ additive scoring on a 110-point scale with a brittle mandatory-data rule, and it
 the documented OTM failure mode ("risk-on → Allow: ATM / Moderate OTM"). Audited head-to-head
 against v4 in [docs/audit-v4-vs-v5.md](../docs/audit-v4-vs-v5.md).
 
-## v6 — synthesis (in design)
+## v6 — synthesis ([v6.md](v6.md), drafted — pending human review before tag `v6.0`)
 Verdict-driven synthesis of both: v4's banded scoring chassis and discipline + v5's macro
 concept rebuilt as **veto/modifier (never additive points)**, plus provisions neither parent
 had — a hard ≥60Δ floor, universe & thesis-rotation mechanics (anti-fixation), an early
