@@ -19,7 +19,12 @@ additive scoring on a 110-point scale with a brittle mandatory-data rule, and it
 the documented OTM failure mode ("risk-on → Allow: ATM / Moderate OTM"). Audited head-to-head
 against v4 in [docs/audit-v4-vs-v5.md](../docs/audit-v4-vs-v5.md).
 
-## v6 — synthesis ([v6.md](v6.md), drafted — pending human review before tag `v6.0`)
+## v6.1 — first production amendment (2026-07-08, same day as v6.0)
+Run 1 against the real portfolio showed §5.9 counting legacy equity holdings toward
+same-thesis crowding, blocking the entire active universe. Human ruling: only
+options/LEAPS count toward crowding ([ADR 0006](../docs/decisions/0006-crowding-counts-options-only.md)).
+
+## v6.0 — synthesis ([v6.md](v6.md), human-reviewed and tagged 2026-07-08)
 Verdict-driven synthesis of both: v4's banded scoring chassis and discipline + v5's macro
 concept rebuilt as **veto/modifier (never additive points)**, plus provisions neither parent
 had — a hard ≥60Δ floor, universe & thesis-rotation mechanics (anti-fixation), an early
