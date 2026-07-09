@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-07",
+  "run": { "started_at": "2026-07-07T07:30:11-04:00", "mode": "scheduled", "report_type": "DEGRADED", "framework_version": "v6.0" },
+  "regime": {
+    "verdict": "NEUTRAL",
+    "confidence": "Low",
+    "reasoning": "Web-sourced macro only: yields stable, VIX print unavailable from chain source. Confidence LOW — one leg of the indicator set is down.",
+    "indicators": {
+      "ust10y": { "value": 4.06, "trend": "stable", "source": "web", "as_of": "2026-07-07T07:31:00-04:00" },
+      "ust2y": { "value": 3.68, "trend": "stable", "source": "web", "as_of": "2026-07-07T07:31:00-04:00" },
+      "fed_stance": { "value": "hold, easing bias", "trend": "unchanged", "source": "web", "as_of": "2026-07-07" },
+      "vix": { "value": null, "trend": null, "source": null, "as_of": null, "note": "robinhood unreachable; web print not timely enough to trust" },
+      "hy_spreads": { "value": null, "trend": null, "source": null, "as_of": null, "note": "unavailable" },
+      "sector_leadership": { "value": "software consolidating post-bounce", "trend": "stable", "source": "web", "as_of": "2026-07-07" },
+      "iv_environment": { "value": null, "trend": null, "source": null, "as_of": null, "note": "requires live chain — unavailable" }
+    },
+    "regime_change_challenge": "Cannot fully run — volatility leg unobservable. Verdict held at NEUTRAL with LOW confidence.",
+    "effective_threshold": 70
+  },
+  "rotation_watch": { "summary": "Web-only signals unchanged from 7/6; chain-side confirmation unavailable.", "direction": "toward", "targets": ["enterprise data platforms"], "confidence": "Low", "signals": ["carryover from 2026-07-06"] },
+  "thesis": { "name": "SaaSpocalypse", "adopted": "2026-07-08", "status": "INTACT", "challenge": null },
+  "screened": [
+    { "ticker": "NMBS", "source": "core", "disposition": "gated", "gate_failed": "binary_event", "note": "earnings 7/9 — gate ran on cached calendar" }
+  ],
+  "new_name_quota": { "required": 3, "met": false, "names": [], "note": "discovery scan suspended — cannot liquidity-gate new names without live chain" },
+  "candidates": [],
+  "nearest_miss": null,
+  "repeat_flags": [],
+  "correlation_set": { "equities": [], "options": [], "note": "positions pull failed — correlation gate cannot run" },
+  "watchlist_changes": [],
+  "data_freshness": {
+    "robinhood": { "ok": false, "at": null, "note": "connector unreachable after 3 attempts, 07:30–07:36 ET" },
+    "web": { "ok": true, "at": "2026-07-07T07:34:00-04:00" },
+    "massive": { "ok": true, "at": null, "note": "not applicable — no candidates" }
+  },
+  "degraded": { "is_degraded": true, "missing": ["live option chains", "live quotes/Greeks/OI/spreads", "positions (correlation gate)", "IV environment"] }
+}

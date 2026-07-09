@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-03",
+  "run": { "started_at": "2026-07-03T07:30:07-04:00", "mode": "scheduled", "report_type": "HOLIDAY", "framework_version": "v6.0" },
+  "regime": null,
+  "rotation_watch": null,
+  "thesis": { "name": "SaaSpocalypse", "adopted": "2026-07-08", "status": "INTACT", "challenge": null },
+  "screened": [],
+  "new_name_quota": { "required": 0, "met": true, "names": [] },
+  "candidates": [],
+  "nearest_miss": null,
+  "repeat_flags": [],
+  "correlation_set": { "equities": [], "options": [] },
+  "watchlist_changes": [],
+  "data_freshness": { "robinhood": { "ok": true, "at": "2026-07-03T07:30:12-04:00", "note": "market-status check only" }, "web": { "ok": true, "at": null }, "massive": { "ok": true, "at": null } },
+  "degraded": { "is_degraded": false, "missing": [] },
+  "holiday": { "reason": "Independence Day (observed)", "next_session": "2026-07-06" }
+}

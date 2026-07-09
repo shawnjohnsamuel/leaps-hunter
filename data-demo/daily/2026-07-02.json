@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-02",
+  "run": { "started_at": "2026-07-02T07:30:41-04:00", "mode": "scheduled", "report_type": "CANDIDATE", "framework_version": "v6.0" },
+  "regime": {
+    "verdict": "NEUTRAL",
+    "confidence": "High",
+    "reasoning": "Yields drifting lower for a month, Fed on hold with an easing bias, VIX mid-range. No euphoria, no stress — quality dislocations are tradable.",
+    "indicators": {
+      "ust10y": { "value": 4.08, "trend": "falling_1m", "source": "web", "as_of": "2026-07-02T07:31:00-04:00" },
+      "ust2y": { "value": 3.71, "trend": "falling_1m", "source": "web", "as_of": "2026-07-02T07:31:00-04:00" },
+      "fed_stance": { "value": "hold, easing bias", "trend": "dovish_drift", "source": "web", "as_of": "2026-07-02" },
+      "vix": { "value": 17.4, "trend": "mid_range", "source": "robinhood", "as_of": "2026-07-02T07:32:10-04:00" },
+      "hy_spreads": { "value": null, "trend": null, "source": null, "as_of": null, "note": "unavailable today; verdict confidence unaffected — other indicators consistent" },
+      "sector_leadership": { "value": "financials/industrials lead 1mo; software lagging", "trend": "rotation_watch", "source": "web", "as_of": "2026-07-02" },
+      "iv_environment": { "value": "elevated in software", "trend": "post-selloff", "source": "robinhood", "as_of": "2026-07-02" }
+    },
+    "regime_change_challenge": "A flip toward RISK-OFF would show HY spreads widening with VIX >22 and defensives leading — none present today.",
+    "effective_threshold": 70
+  },
+  "rotation_watch": {
+    "summary": "Institutions appear to be rotating toward quality software laggards; early and tentative.",
+    "direction": "toward",
+    "targets": ["enterprise data platforms", "infra software"],
+    "confidence": "Medium",
+    "signals": ["software equal-weight vs cap-weight basing 2 weeks", "two 13F adds in beaten-down platform names", "short interest in DFRG down 18% from peak"]
+  },
+  "thesis": { "name": "SaaSpocalypse", "adopted": "2026-07-08", "status": "INTACT", "challenge": null },
+  "screened": [
+    { "ticker": "DFRG", "source": "core", "disposition": "scored", "score": 78, "note": "down 17% in 4 days on guidance conservatism; fundamentals intact" },
+    { "ticker": "NMBS", "source": "core", "disposition": "gated", "gate_failed": "binary_event", "note": "earnings 2026-07-09 — inside 14-day window" },
+    { "ticker": "VLTC", "source": "core", "disposition": "gated", "gate_failed": "momentum_chasing", "note": "up 44% in 30 days, 3% off 52-week high" },
+    { "ticker": "ORBT", "source": "discovery", "disposition": "gated", "gate_failed": "liquidity_floor", "note": "Jan-2028 LEAPS OI 22 — unverifiable depth, watchlisted" },
+    { "ticker": "GRDL", "source": "discovery", "disposition": "gated", "gate_failed": "portfolio_correlation", "note": "already held in equities — manage existing position" },
+    { "ticker": "PLNR", "source": "discovery", "disposition": "gated", "gate_failed": "single_variable", "note": "thesis is entirely 'rates fall'" }
+  ],
+  "new_name_quota": { "required": 3, "met": true, "names": ["ORBT", "GRDL", "PLNR"] },
+  "candidates": [
+    {
+      "ticker": "DFRG",
+      "company": "DataForge Systems (fictional)",
+      "score": 78,
+      "tier": "HIGH CONVICTION",
+      "scores": { "entry_timing": 22, "catalyst_density": 15, "valuation_quality": 16, "positioning_sentiment": 13, "structure_survivability": 12 },
+      "entry": { "price": 84.2, "recent_move": "-17% in 4 days", "why_now": "Guidance conservatism read as demand collapse; NRR 118% and FCF margin intact — overreaction, not impairment." },
+      "catalysts": [
+        { "horizon": "near", "text": "Q3 platform pricing tier launch (company-controlled)", "company_controlled": true },
+        { "horizon": "mid", "text": "$400M buyback authorization, ~6% of float", "company_controlled": true },
+        { "horizon": "long", "text": "Enterprise AI-workload attach expanding data consumption", "company_controlled": false }
+      ],
+      "valuation": { "summary": "EV/FCF 21 vs 24% growth (rule-of-40 = 42); net cash $1.1B", "rate_adjustment_applied": false },
+      "positioning": { "summary": "Early re-accumulation into a washed-out narrative", "evidence": ["two new 13F positions", "short interest -18% from peak", "insider buy 2026-06-25"], "rotation_watch_aligned": true },
+      "structure": {
+        "type": "deep_itm_call", "strike": 65, "delta": 0.74, "expiry": "2028-01-21",
+        "premium": 27.8, "breakeven": 92.8, "contracts_per_10k": 3,
+        "liquidity": { "oi": 412, "spread_pct": 3.1, "avg_volume": 260, "verified_at": "2026-07-02T07:41:22-04:00", "source": "robinhood" }
+      },
+      "scenarios": {
+        "bear": { "probability": 0.25, "stock_price": 68, "leaps_return_pct": -55 },
+        "base": { "probability": 0.5, "stock_price": 122, "leaps_return_pct": 182 },
+        "bull": { "probability": 0.25, "stock_price": 155, "leaps_return_pct": 260 },
+        "asymmetry_ratio": 3.3,
+        "weighted_ev_pct": 142
+      },
+      "risk": {
+        "invalidation": ["NRR prints below 110%", "flagship-tier churn in two consecutive quarters", "credible AI-native competitor wins a lighthouse account"],
+        "profit_ladder": "sell 1/3 at +100%, 1/3 at +200%, trail remainder at +300%",
+        "time_exits": "down >50% in 60 days → formal reassessment; flat at 6 months → roll or exit",
+        "macro_trigger": "10Y decisively above 4.75% forces review"
+      },
+      "repeat": null
+    }
+  ],
+  "nearest_miss": null,
+  "repeat_flags": [],
+  "correlation_set": { "equities": ["GRDL", "QNTA"], "options": ["HLIX"] },
+  "watchlist_changes": [ { "ticker": "ORBT", "action": "add", "reason": "quality name, failed only on chain depth — recheck weekly" } ],
+  "data_freshness": {
+    "robinhood": { "ok": true, "at": "2026-07-02T07:41:22-04:00" },
+    "web": { "ok": true, "at": "2026-07-02T07:35:00-04:00" },
+    "massive": { "ok": true, "at": "2026-07-02T07:38:00-04:00", "note": "historical validation on DFRG Jan-2028 65C only" }
+  },
+  "degraded": { "is_degraded": false, "missing": [] }
+}

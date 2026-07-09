@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-06",
+  "run": { "started_at": "2026-07-06T07:30:19-04:00", "mode": "scheduled", "report_type": "ZERO_TRADE", "framework_version": "v6.0" },
+  "regime": {
+    "verdict": "RISK-ON",
+    "confidence": "Medium",
+    "reasoning": "Post-holiday drift higher, VIX 14.1 and falling, breadth strong. Risk-on regimes demand MORE entry-timing scrutiny, not less — genuine panic is scarce when everything is green.",
+    "indicators": {
+      "ust10y": { "value": 4.04, "trend": "falling_1m", "source": "web", "as_of": "2026-07-06T07:31:00-04:00" },
+      "ust2y": { "value": 3.66, "trend": "falling_1m", "source": "web", "as_of": "2026-07-06T07:31:00-04:00" },
+      "fed_stance": { "value": "hold, easing bias", "trend": "unchanged", "source": "web", "as_of": "2026-07-06" },
+      "vix": { "value": 14.1, "trend": "falling", "source": "robinhood", "as_of": "2026-07-06T07:32:02-04:00" },
+      "hy_spreads": { "value": "tightening", "trend": "risk_on", "source": "web", "as_of": "2026-07-06" },
+      "sector_leadership": { "value": "broad; software bouncing with the market", "trend": "lifting_all_boats", "source": "web", "as_of": "2026-07-06" },
+      "iv_environment": { "value": "normalizing in software", "trend": "falling", "source": "robinhood", "as_of": "2026-07-06" }
+    },
+    "regime_change_challenge": "A flip toward euphoria/blow-off would show parabolic breadth and call-skew extremes; sentiment is warm but not manic. Verdict stands at RISK-ON.",
+    "effective_threshold": 70
+  },
+  "rotation_watch": {
+    "summary": "Rotation toward software laggards continuing but now WITH price — the early-entry window is narrowing.",
+    "direction": "toward",
+    "targets": ["enterprise data platforms"],
+    "confidence": "Medium",
+    "signals": ["software equal-weight breaking above 50DMA", "DFRG +9% since 7/2 surfacing"]
+  },
+  "thesis": {
+    "name": "SaaSpocalypse",
+    "adopted": "2026-07-08",
+    "status": "INTACT",
+    "challenge": "Against the thesis: the sector bounce and normalizing IV say the panic phase may be ending; if the discount keeps closing at this rate the thesis is weeks from WEAKENING. For the thesis: valuations remain well below 5-year norms, and the bounce is beta, not re-rating. Verdict: INTACT, trending toward WEAKENING — watch the discount-to-norms spread weekly."
+  },
+  "screened": [
+    { "ticker": "DFRG", "source": "core", "disposition": "gated", "gate_failed": "repeat_guard", "score": null, "note": "REPEAT (surfaced 7/2, +9% since). Nothing changed except price going the wrong direction for entry — 'still cheap' does not requalify." },
+    { "ticker": "NMBS", "source": "core", "disposition": "gated", "gate_failed": "binary_event", "note": "earnings 7/9" },
+    { "ticker": "HLIX", "source": "core", "disposition": "gated", "gate_failed": "portfolio_correlation", "note": "options position already held" },
+    { "ticker": "STRA", "source": "discovery", "disposition": "gated", "gate_failed": "entry_timing", "score": 61, "note": "quality name but no genuine drawdown — flat in a rallying tape scores 10/25 on entry; total under threshold" },
+    { "ticker": "CMPL", "source": "discovery", "disposition": "gated", "gate_failed": "valuation_insanity", "note": "unprofitable at 61x P/S" },
+    { "ticker": "FLUX", "source": "discovery", "disposition": "gated", "gate_failed": "momentum_chasing", "note": "up 52% in 30 days on AI narrative" }
+  ],
+  "new_name_quota": { "required": 3, "met": true, "names": ["STRA", "CMPL", "FLUX"] },
+  "candidates": [],
+  "nearest_miss": { "ticker": "STRA", "reason": "Solid business, wrong entry: no panic, no drawdown — entry timing 10/25 put it at 61. The framework buys fear, and there is none today." },
+  "repeat_flags": [ { "ticker": "DFRG", "last_surfaced": "2026-07-02", "what_changed": "price +9% — worse entry, not better; re-surfacing declined" } ],
+  "correlation_set": { "equities": ["GRDL", "QNTA"], "options": ["HLIX"] },
+  "watchlist_changes": [],
+  "data_freshness": {
+    "robinhood": { "ok": true, "at": "2026-07-06T07:39:44-04:00" },
+    "web": { "ok": true, "at": "2026-07-06T07:34:00-04:00" },
+    "massive": { "ok": true, "at": null, "note": "not needed today" }
+  },
+  "degraded": { "is_degraded": false, "missing": [] }
+}
