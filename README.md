@@ -1,70 +1,75 @@
-# LEAPS Hunter
+# LEAPS Hunter · Take the LEAP
 
 A disciplined, AI-assisted options-screening system that hunts for deep-ITM, long-dated
-LEAPS calls on large-cap quality names caught in **panic-driven (not fundamental) selloffs** —
-and, on most days, correctly recommends **nothing at all**.
+LEAPS calls on large-cap quality names caught in **panic-driven (not fundamental)
+selloffs** — and, on most days, correctly recommends **nothing at all**. Its public face
+is **Take the LEAP**: a daily email verdict plus a dashboard where the restraint itself
+is the product.
 
-> **Status:** in active development. This repo currently contains the framework's design
-> history and the audit that produced v6; the screener skill, storage layer, and dashboard
-> land in subsequent commits. Built with [Claude Code](https://claude.com/claude-code) as a
-> working example of AI-assisted development — the commit history is part of the point.
+> Built with [Claude Code](https://claude.com/claude-code) as a working example of
+> AI-assisted development. The commit history — audit → synthesis → production lessons →
+> spec amendments — is part of the point.
+
+## The record so far
+
+Three production runs, zero forced trades, three *different* hard gates each catching a
+would-be trade:
+
+| Run | Nearest miss | Killed by | What changed |
+|---|---|---|---|
+| 2026-07-08 | INTU (~74 informal) | portfolio-correlation gate | Gate was too strict — amended same day ([ADR 0006](docs/decisions/0006-crowding-counts-options-only.md), spec → v6.1) |
+| 2026-07-09 | INTU again | liquidity floors, re-verified intraday | "Closing spreads over-reject" hypothesis tested and **refuted** — rejection is structural |
+| 2026-07-10 | TRI (~76–78 informal) | option duration (no LEAPS past Jan-2027) | Best raw setup yet; un-ownable in the mandated structure |
 
 ## The core idea
 
-Most option screeners optimize for activity. This one optimizes for **restraint**:
-
 - Asymmetry comes from mispricing, not momentum — buy panic, never euphoria.
 - Multiple independent catalysts beat any single dependency.
-- Survivability (deep ITM, long duration, hard delta floor) beats maximum leverage.
-- **The modal correct output is zero trades.** A zero-trade day is a successful run,
-  reported in full — not a silent or broken one.
+- Survivability (deep ITM, ≥60Δ hard floor, long duration) beats maximum leverage.
+- Macro acts as a **veto, never as points** ([ADR 0001](docs/decisions/0001-macro-as-veto-not-additive-points.md)).
+- **The modal correct output is zero trades**, reported in full — never silence.
 
-## How it works (architecture at a glance)
+## Architecture
 
 ```
-                       ┌──────────────────────────────┐
-  7:30am ET weekdays → │  Daily screener (Claude Code │
-  (scheduled task)     │  skill, framework v6)        │
-                       └──────────────┬───────────────┘
-        Robinhood MCP (read-only) ────┤   live chains, Greeks, OI, spreads,
-        Massive Market Data ──────────┤   historical contract OHLC (backtest layer)
-        Web search ───────────────────┤   macro regime, fundamentals, news
-                                      ▼
-                       dated JSON + markdown reports
-                       (private data repo — never here)
-                                      ▼
-                       ┌──────────────────────────────┐
-                       │  Dashboard (static React)     │
-                       │  regime verdict · scores ·    │
-                       │  history · quick-eval panel   │
-                       └──────────────────────────────┘
+daily screener run (Claude session — desktop or cloud — with read-only brokerage access)
+  ├─ live chains/Greeks/positions: Robinhood MCP (sole live source, ADR 0004)
+  ├─ historical contract OHLC: Massive Market Data     ├─ macro/news: web search
+  ▼
+private report → leaps-hunter-data (private repo: full detail, positions-derived data)
+  ▼
+scripts/sanitize.py — strict ALLOWLIST (ADR 0002 + CI leak tripwire)
+  ▼
+public-data/daily/*.json (this repo)
+  ├─ triggers .github/workflows/broadcast.yml → Resend email to subscribers
+  └─ app/ — Next.js "Take the LEAP": landing + signup, dashboard, LEAP Ledger
 ```
 
-Key design decisions are recorded as short ADRs in [docs/decisions/](docs/decisions/),
-including why macro acts as a **veto, not additive points**, and why the public/private
-boundary is **two repos, not a .gitignore**.
+## Repository guide
 
-## Design history
-
-The framework is on its sixth major revision. Two independently developed predecessors —
-**v4** (developed with Claude, production-tested) and **v5** (developed with ChatGPT,
-never run live) — were audited head-to-head before synthesis:
-
-- [framework/v4.md](framework/v4.md) — the production incumbent
-- [framework/v5.md](framework/v5.md) — the independent challenger
-- [docs/audit-v4-vs-v5.md](docs/audit-v4-vs-v5.md) — the full comparative audit and verdict
-- [framework/CHANGELOG.md](framework/CHANGELOG.md) — version lineage
+| Path | What it is |
+|---|---|
+| [framework/v6.md](framework/v6.md) | The operating spec (v6.1) — gates, scoring bands, tool contract |
+| [framework/v4.md](framework/v4.md) / [v5.md](framework/v5.md) | The two predecessor frameworks, preserved as design history |
+| [docs/audit-v4-vs-v5.md](docs/audit-v4-vs-v5.md) | The head-to-head audit that justified v6 |
+| [docs/decisions/](docs/decisions/) | ADRs — including two written *after* production runs changed the rules |
+| [docs/storage-schema.md](docs/storage-schema.md) | Private + public data contracts |
+| [scripts/](scripts/) | Sanitizer (allowlist + leak tripwires) and email renderer |
+| [public-data/](public-data/) | Sanitized daily artifacts — the only screener output that exists publicly |
+| [app/](app/) | Take the LEAP — Next.js site (Vercel) |
+| [data-demo/](data-demo/) | Synthetic sample days (fictional tickers) covering every report type |
+| [.claude/skills/](.claude/skills/) | `daily-screener` (runs v6 end-to-end) and `quick-eval` (gate-check) |
 
 ## Safety and boundaries
 
-- **Read-only by construction.** The screener may only call read-only brokerage tools
-  (quotes, chains, positions). Order placement, review, and cancellation tools are
-  denylisted by name in the framework spec itself. All actual trades are placed manually
-  by a human.
-- **No live data in this repo — ever.** Real daily outputs, positions, and anything
-  account-adjacent live in a separate private repo. This repo carries only methodology,
-  code, and synthetic demo data. A gitleaks pre-commit hook guards the history.
-- **Not financial advice.** This is a personal research tool and engineering showcase.
+- **Read-only by construction.** The framework enumerates allowed brokerage tools and
+  denylists order placement/review/cancellation *by name* (v6 §2). All actual trades are
+  placed manually by a human.
+- **Two-plane data design** ([ADR 0002](docs/decisions/0002-two-repo-public-private-boundary.md)):
+  real outputs live in a separate private repo; this repo receives only allowlist-sanitized
+  artifacts, with a held-ticker tripwire at generation time and a CI leak-check on every push.
+- **Serious disclaimers, structurally:** every email and page carries it — rules-based AI
+  research output, **not financial advice**, options can lose 100% of premium, DYOR.
 
 ## License
 
