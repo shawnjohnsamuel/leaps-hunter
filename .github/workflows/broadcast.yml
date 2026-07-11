@@ -32,7 +32,10 @@ jobs:
               req = urllib.request.Request(
                   url, data=json.dumps(payload).encode(),
                   headers={"Authorization": f"Bearer {os.environ['RESEND_API_KEY']}",
-                           "Content-Type": "application/json"})
+                           "Content-Type": "application/json",
+                           # Cloudflare fronting api.resend.com blocks urllib's default
+                           # UA (error 1010) — verified empirically 2026-07-10.
+                           "User-Agent": "take-the-leap-broadcast/1.0"})
               with urllib.request.urlopen(req) as r:
                   return json.load(r)
           created = call("https://api.resend.com/broadcasts", {
