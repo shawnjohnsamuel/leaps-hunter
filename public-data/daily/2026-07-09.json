@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "kind": "public-daily",
+  "disclaimer": "Output of a rules-based AI research system. NOT financial advice; no client relationship exists; this may be wrong. Do your own research. Options can lose 100% of premium. Hypothetical results are not real returns.",
+  "date": "2026-07-09",
+  "report_type": "ZERO_TRADE",
+  "framework_version": "v6.1",
+  "regime": {
+    "verdict": "NEUTRAL",
+    "confidence": "Medium",
+    "reasoning": "June FOMC minutes (released 7/8 2pm) tilt hawkish: committee split with hike arguments aired, inflation upside risks 'the core contradiction', wait-and-see stance \u2014 reinforcing the duration leash alongside the Iran/oil inflation impulse. But VIX is 16.6 live, software is catching bids, and the dominant chips-over-software institutional trade is visibly unwinding. Neither panic nor euphoria.",
+    "effective_threshold": 70
+  },
+  "rotation_watch": {
+    "summary": "Rotation INTO beaten-down software is accelerating and now has a named institutional narrative \u2014 Bloomberg reports the year's dominant 'buy chips, sell software' trade is unwinding. Re-entry continues to happen WITH price.",
+    "confidence": "Medium-High"
+  },
+  "thesis": {
+    "name": "SaaSpocalypse",
+    "status": "INTACT"
+  },
+  "screened": {
+    "total": 16,
+    "gates": {
+      "portfolio-fit": 2,
+      "momentum / chasing": 3,
+      "scored below threshold": 8,
+      "liquidity floors": 2,
+      "universe fit": 1
+    }
+  },
+  "candidates": [],
+  "watch_only": [],
+  "nearest_miss": {
+    "ticker": "INTU",
+    "gate": "liquidity floors"
+  },
+  "degraded": false
+}

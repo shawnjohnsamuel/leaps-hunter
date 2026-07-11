@@ -1,0 +1,39 @@
+name: leak-check
+# Tripwire for the public/private boundary (ADR 0002, plan Part 7.1).
+# Fails the build if any public artifact or app code carries private-side field
+# names or holdings-flavored language. Deliberately checks FIELD NAMES and
+# PHRASES, not tickers — the held-ticker check runs privately inside
+# scripts/sanitize.py at generation time, so the ticker list never lives here.
+on:
+  push:
+  pull_request:
+
+jobs:
+  leak-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan public artifacts for private-side terms
+        run: |
+          set -e
+          PATTERNS='correlation_set|portfolio_correlation|account_number|average_buy_price|"quantity"|already held|shares_available'
+          if grep -rInE "$PATTERNS" public-data/ app/ 2>/dev/null; then
+            echo "::error::Private-side term found in public surface — see matches above"
+            exit 1
+          fi
+          echo "leak-check: clean"
+      - name: Validate public artifacts against allowlist keys
+        run: |
+          python3 - << 'EOF'
+          import json, glob, sys
+          ALLOWED = {"schema_version","kind","disclaimer","date","report_type",
+                     "framework_version","regime","rotation_watch","thesis",
+                     "screened","candidates","watch_only","nearest_miss","degraded"}
+          bad = False
+          for f in glob.glob("public-data/**/*.json", recursive=True):
+              extra = set(json.load(open(f))) - ALLOWED
+              if extra:
+                  print(f"::error::{f} carries non-allowlisted keys: {extra}")
+                  bad = True
+          sys.exit(1 if bad else 0)
+          EOF

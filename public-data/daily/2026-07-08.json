@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "kind": "public-daily",
+  "disclaimer": "Output of a rules-based AI research system. NOT financial advice; no client relationship exists; this may be wrong. Do your own research. Options can lose 100% of premium. Hypothetical results are not real returns.",
+  "date": "2026-07-08",
+  "report_type": "ZERO_TRADE",
+  "framework_version": "v6.1",
+  "regime": {
+    "verdict": "NEUTRAL",
+    "confidence": "Medium",
+    "reasoning": "Elevated long yields (10Y 4.48%) plus a fresh oil spike (Iran escalation, WTI +3% to $70.44) put renewed inflation risk on the table and keep duration assets on a leash; but VIX is only 16.1, breadth is broadening (RSP > SPY over 1mo), and no credit stress is visible. Neither panic nor euphoria.",
+    "effective_threshold": 70
+  },
+  "rotation_watch": {
+    "summary": "Institutions rotated AWAY from software over the past month and are now piling back into the beaten-down names this week \u2014 the re-entry is happening WITH price, so the early window (June 22-25 lows) has partially closed.",
+    "confidence": "Medium"
+  },
+  "thesis": {
+    "name": "SaaSpocalypse",
+    "status": "INTACT"
+  },
+  "screened": {
+    "total": 15,
+    "gates": {
+      "portfolio-fit": 2,
+      "momentum / chasing": 3,
+      "scored below threshold": 8,
+      "liquidity floors": 2
+    }
+  },
+  "candidates": [],
+  "watch_only": [],
+  "nearest_miss": {
+    "ticker": "INTU",
+    "gate": "liquidity floors"
+  },
+  "degraded": false
+}

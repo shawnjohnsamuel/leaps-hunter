@@ -65,6 +65,25 @@ repeat:   null | {last_surfaced, what_changed}
 
 Append-only; the repeat-candidate guard (v6 §3c) queries the last 10 trading days.
 
+## `public-data/daily/YYYY-MM-DD.json` — the sanitized public artifact
+
+Produced by [`scripts/sanitize.py`](../scripts/sanitize.py) via a strict **allowlist**
+(fields are copied in by name; nothing else exists publicly). Powers the Take the LEAP
+site and subscriber emails. Keys: `disclaimer` (embedded in the data), `date`,
+`report_type`, `framework_version`, `regime` (verdict/confidence/reasoning/threshold),
+`rotation_watch` (summary/confidence), `thesis` (name/status), `screened` (total +
+gate-type counts — holdings-related gates fold into an anonymous `portfolio-fit` count),
+`candidates` (≥75 only: ticker/score/tier/one_line), `watch_only` (tickers, 70–74),
+`nearest_miss` (structured `{ticker, gate}`; ticker redacted when the gate is
+holdings-related), `degraded`.
+
+Never present, by construction: the correlation set, any named holdings-gated ticker,
+positions data, private free-text (nearest-miss reasons, operational notes,
+spec questions). Guardrails: the sanitizer hard-fails on forbidden terms and on any
+correlation-set ticker appearing in output (checked privately at generation time), and
+[.github/workflows/leak-check.yml](../.github/workflows/leak-check.yml) re-verifies
+field names and phrases on every push.
+
 ## Reader contracts
 
 - **Dashboard:** renders entirely from `latest.json` + `daily/*.json`; shows a STALE

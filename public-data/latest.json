@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "kind": "public-daily",
+  "disclaimer": "Output of a rules-based AI research system. NOT financial advice; no client relationship exists; this may be wrong. Do your own research. Options can lose 100% of premium. Hypothetical results are not real returns.",
+  "date": "2026-07-10",
+  "report_type": "ZERO_TRADE",
+  "framework_version": "v6.1",
+  "regime": {
+    "verdict": "RISK-ON",
+    "confidence": "Medium",
+    "reasoning": "SPX 7575 near highs and VIX down to 15.0 with markets rallying straight through the US-Iran escalation \u2014 risk appetite is high and complacent. The offset: 10Y crept up toward 4.55-4.6% and 'one more hike' talk is alive, so the duration headwind persists. RISK-ON raises entry-timing scrutiny (\u00a74d): genuine panic is scarce and must be proven, not asserted.",
+    "effective_threshold": 70
+  },
+  "rotation_watch": {
+    "summary": "DOWNGRADED: the chips-to-software rotation stalled this week \u2014 chips rebounded hard Thursday and Friday's selling hit the recent software LEADERS while the beaten-down laggards caught bids. Leadership is churning, not cleanly rotating.",
+    "confidence": "Low-Medium"
+  },
+  "thesis": {
+    "name": "SaaSpocalypse",
+    "status": "INTACT"
+  },
+  "screened": {
+    "total": 16,
+    "gates": {
+      "portfolio-fit": 2,
+      "momentum / chasing": 4,
+      "scored below threshold": 6,
+      "universe fit": 1,
+      "option duration": 1
+    }
+  },
+  "candidates": [],
+  "watch_only": [],
+  "nearest_miss": {
+    "ticker": "TRI",
+    "gate": "option duration"
+  },
+  "degraded": false
+}
