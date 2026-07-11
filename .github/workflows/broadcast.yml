@@ -1,0 +1,45 @@
+name: broadcast
+# Sends the daily subscriber email when a new sanitized artifact lands (plan Part 7.2).
+# Reads ONLY public-data (post-sanitizer); the only secret here is the Resend key.
+# No-ops cleanly until RESEND_API_KEY / RESEND_AUDIENCE_ID / SITE_URL are configured.
+on:
+  push:
+    branches: [main]
+    paths: ["public-data/daily/*.json"]
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render and send via Resend Broadcast
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_AUDIENCE_ID: ${{ secrets.RESEND_AUDIENCE_ID }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          if [ -z "$RESEND_API_KEY" ] || [ -z "$RESEND_AUDIENCE_ID" ] || [ -z "$SITE_URL" ]; then
+            echo "Resend not configured yet — skipping broadcast (this is expected pre-launch)."
+            exit 0
+          fi
+          python3 scripts/render_email.py public-data/latest.json "$SITE_URL" > /tmp/email.json
+          SUBJECT=$(python3 -c "import json;print(json.load(open('/tmp/email.json'))['subject'])")
+          python3 - << 'EOF'
+          import json, os, urllib.request
+          email = json.load(open("/tmp/email.json"))
+          def call(url, payload):
+              req = urllib.request.Request(
+                  url, data=json.dumps(payload).encode(),
+                  headers={"Authorization": f"Bearer {os.environ['RESEND_API_KEY']}",
+                           "Content-Type": "application/json"})
+              with urllib.request.urlopen(req) as r:
+                  return json.load(r)
+          created = call("https://api.resend.com/broadcasts", {
+              "audience_id": os.environ["RESEND_AUDIENCE_ID"],
+              "from": f"Take the LEAP <daily@{os.environ['SITE_URL'].split('//')[1]}>",
+              "subject": email["subject"],
+              "html": email["html"],
+          })
+          call(f"https://api.resend.com/broadcasts/{created['id']}/send", {})
+          print("broadcast sent:", created["id"])
+          EOF

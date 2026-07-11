@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Render the daily subscriber email (HTML + subject) from a sanitized public artifact.
+
+Reads ONLY public-data JSON (already through the sanitizer's allowlist), so nothing
+private can reach an inbox by construction. Emits JSON {subject, html} on stdout for
+the broadcast workflow.
+
+Usage: render_email.py public-data/latest.json <site_url>
+"""
+import html
+import json
+import sys
+
+DISCLAIMER = (
+    "NOT FINANCIAL ADVICE. This email is the output of a rules-based AI research "
+    "system. It can be wrong. Nothing here is a recommendation to buy or sell any "
+    "security; no advisory relationship exists. Options can lose 100% of premium. "
+    "Do your own research and consult a licensed professional."
+)
+
+
+def main():
+    pub = json.loads(open(sys.argv[1]).read())
+    site = sys.argv[2].rstrip("/")
+    e = html.escape
+    date, regime = pub["date"], pub.get("regime") or {}
+    candidates = pub.get("candidates") or []
+    gates = (pub.get("screened") or {}).get("gates", {})
+    total = (pub.get("screened") or {}).get("total", 0)
+
+    if pub["report_type"] == "HOLIDAY":
+        subject = f"Take the LEAP — {date}: market closed"
+        body_bits = ["<p>Market holiday — no screen was run. Next session resumes the record.</p>"]
+    elif candidates:
+        tickers = ", ".join(c["ticker"] for c in candidates)
+        subject = f"Take the LEAP — {date}: {tickers} surfaced ({regime.get('verdict', '')})"
+        body_bits = [
+            f"<p><b>{len(candidates)} candidate(s) cleared every gate today.</b></p>",
+            "<ul>"
+            + "".join(
+                f"<li><b>{e(c['ticker'])}</b> — {c['score']}/100 · {e(c['tier'])}"
+                + (f"<br><i>{e(c['one_line'])}</i>" if c.get("one_line") else "")
+                + "</li>"
+                for c in candidates
+            )
+            + "</ul>",
+            f'<p>Full details, structure, and the honest caveats live on the site: <a href="{site}/dashboard">the record</a>.</p>',
+        ]
+    else:
+        subject = f"Take the LEAP — {date}: 0 trades, discipline held ({regime.get('verdict', '')})"
+        body_bits = [
+            f"<p><b>Zero deployable trades today — that is the system working.</b> "
+            f"{total} names screened; every one died at a gate or scored below threshold.</p>"
+        ]
+
+    if regime:
+        body_bits.insert(
+            0,
+            f"<p><b>Regime: {e(regime.get('verdict', ''))}</b> ({e(regime.get('confidence', ''))} confidence)<br>"
+            f"{e(regime.get('reasoning', ''))}</p>",
+        )
+    if gates:
+        rows = "".join(f"<li>{e(g)}: {n}</li>" for g, n in gates.items())
+        body_bits.append(f"<p>Gates fired today:</p><ul>{rows}</ul>")
+    if pub.get("degraded"):
+        body_bits.append("<p><b>⚠️ Degraded run:</b> a data source was unavailable; no deployable verdicts were possible.</p>")
+
+    html_doc = f"""<div style="font-family:system-ui,sans-serif;max-width:560px;margin:auto;color:#1a1a1a">
+<h2 style="margin-bottom:0">Take the <span style="color:#059669">LEAP</span></h2>
+<p style="color:#666;margin-top:4px">{date} · daily verdict</p>
+<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;font-size:13px;margin:12px 0">
+<b>⚠️ {DISCLAIMER}</b></div>
+{''.join(body_bits)}
+<p><a href="{site}/dashboard">View the full record →</a></p>
+<hr style="border:none;border-top:1px solid #ddd;margin:24px 0">
+<p style="font-size:12px;color:#888">{DISCLAIMER} You are receiving this because you
+subscribed at {site}. Unsubscribe any time via the link below.</p>
+</div>"""
+    print(json.dumps({"subject": subject, "html": html_doc}))
+
+
+if __name__ == "__main__":
+    main()
