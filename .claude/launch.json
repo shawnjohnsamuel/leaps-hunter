@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "take-the-leap",
+      "runtimeExecutable": "/Users/shawnsamuel/.local/bin/npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "app",
+      "port": 3000
+    }
+  ]
+}
