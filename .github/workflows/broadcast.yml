@@ -6,6 +6,7 @@ on:
   push:
     branches: [main]
     paths: ["public-data/daily/*.json"]
+  workflow_dispatch: {}
 
 jobs:
   send:

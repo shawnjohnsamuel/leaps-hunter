@@ -21,6 +21,9 @@ DISCLAIMER = (
 
 def main():
     pub = json.loads(open(sys.argv[1]).read())
+    if pub.get("kind") != "public-daily":
+        sys.exit("REFUSED: input is not a sanitized public artifact (kind != 'public-daily'). "
+                 "Emails render only from post-sanitizer data — run scripts/sanitize.py first.")
     site = sys.argv[2].rstrip("/")
     e = html.escape
     date, regime = pub["date"], pub.get("regime") or {}
@@ -74,7 +77,7 @@ def main():
 <p><a href="{site}/dashboard">View the full record →</a></p>
 <hr style="border:none;border-top:1px solid #ddd;margin:24px 0">
 <p style="font-size:12px;color:#888">{DISCLAIMER} You are receiving this because you
-subscribed at {site}. Unsubscribe any time via the link below.</p>
+subscribed at {site}. <a href="{{{{{{RESEND_UNSUBSCRIBE_URL}}}}}}">Unsubscribe</a> any time.</p>
 </div>"""
     print(json.dumps({"subject": subject, "html": html_doc}))
 
