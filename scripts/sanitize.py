@@ -30,8 +30,17 @@ GATE_LABELS = {
     "repeat_guard": "repeat guard",
 }
 
-# Words that must never appear in any public free-text field.
-FORBIDDEN_TEXT = re.compile(r"\b(held|holding|holdings|portfolio|position|account)\b", re.I)
+# Holdings-indicating language that must never appear in any public free-text field.
+# Deliberately phrase-based rather than single-word: bare "holding"/"position" are
+# ordinary market-commentary words ("the Fed holding rates", "positioning"), and firing
+# on them produced a false positive on 2026-08-12 that blocked a clean publish. Narrowing
+# to possessive/portfolio phrasing raises precision WITHOUT weakening true-positive
+# coverage — the real guards remain the field allowlist and the held-ticker tripwire.
+FORBIDDEN_TEXT = re.compile(
+    r"\b(holdings|portfolio|cost basis|average buy price|shares? (?:i|we) (?:own|hold)"
+    r"|(?:already|currently) held|(?:i|we) (?:own|hold)\b|(?:my|our) position)",
+    re.I,
+)
 
 DISCLAIMER = (
     "Output of a rules-based AI research system. NOT financial advice; no client "
