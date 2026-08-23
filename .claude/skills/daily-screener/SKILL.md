@@ -14,7 +14,8 @@ and follow the spec.
 1. Resolve the private data directory from `.claude/leaps-data-path.local` (one absolute
    path on line 1). If the file is missing, ask the user for the path once and create it.
    Never write real outputs anywhere inside this (public) repo.
-2. Read `latest.json` and `surfaced.json` from the data dir for rolling state (§0.4).
+2. Read `latest.json`, `surfaced.json`, and `watchlist-meta.json` from the data dir for
+   rolling state (§0.4). Create `watchlist-meta.json` on first run (see Cost discipline).
 
 ## Execution order (v6 sections)
 
@@ -45,9 +46,36 @@ and follow the spec.
   down ⇒ DEGRADED report, zero deployable verdicts (§8.3).
 - Never lower a gate or stretch a band to make the day "productive" (§1).
 
-## Cost discipline
+## Cost discipline (binding — these are rules, not suggestions)
 
-Gate before you research: a name killed by the repeat guard or a binary event needs zero
-web searches. Full valuation/positioning research is only for names that pass all §5
-gates. Target: a zero-trade day should complete in well under half the tool calls of a
-candidate day.
+**Run this skill in a fresh session or a scheduled/cloud run — never inside a long
+working conversation.** The screening work is a minority of the real cost; re-paying for
+a large conversation history on every turn is the majority. This is the single biggest
+lever.
+
+**Tool budget, cheapest-first.** Gate before you research: a name killed by the repeat
+guard, a binary event, momentum, or portfolio correlation needs zero further calls.
+
+| Need | Use | Never |
+|---|---|---|
+| Prices, % moves, bid/ask | `get_equity_quotes` (lean; batch up to ~20) | — |
+| 52-wk range, market cap, P/E | metadata cache (below), else `get_equity_fundamentals` | Calling fundamentals on the whole watchlist — it returns a full company biography per symbol (CEO, employee count, description) |
+| Earnings dates | per-ticker checks on the specific names being screened | `get_earnings_calendar` with a broad/market-wide filter — one such call returned 56K+ characters and had to be spilled to a file |
+| Chain structure | `get_option_chains` (expirations only) | Pulling contracts before a name reaches the structure stage |
+| OI / spread / Greeks | `get_option_quotes` on a handful of candidate strikes | Whole-chain contract sweeps |
+
+**Metadata cache.** Slow-moving fields — 52-week high/low and their dates, market cap,
+sector, GAAP P/E, average volume — live in `watchlist-meta.json` in the data dir with a
+`refreshed` date. Read from it; refresh only entries older than 7 calendar days, or when
+a name's price moves outside its cached 52-week range. Prices and % moves are always live.
+
+**Report shape.** The markdown is the human artifact and carries the prose. The JSON
+carries data: keep `note` fields to one or two sentences, put extended reasoning in the
+`.md` only. Do not duplicate long narrative across both files.
+
+**Targets.** A zero-trade day should finish in roughly 10–15 tool calls; a candidate day
+in 20–25. If a zero-trade run exceeds ~20 calls, something was researched before it was
+gated — say so in `operational_notes`.
+
+**Cheap alternative.** For a single ticker or a "what about X" question, use `quick-eval`
+instead of this skill — it reuses cached context and runs the five never-skip gates only.
