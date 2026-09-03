@@ -1,6 +1,6 @@
 # v7 migration plan — framework v6.1 → v7.0
 
-**Status:** approved 2026-09-03, in progress · **Governing doc:** [`framework/v7.md`](../framework/v7.md) (lands in Phase 1)
+**Status:** approved 2026-09-03, in progress (Phases 0-2 complete) · **Governing doc:** [`framework/v7.md`](../framework/v7.md)
 
 v7 is not a spec revision. v6 was a rubric a model followed; v7 is a risk engine a model
 feeds. This plan replaces the framework, moves the daily run to the cloud, and rebuilds
@@ -141,8 +141,7 @@ Sunday, when nothing it needs is live-quoted.
 |---|---|---|
 | **0** ✅ | Verify load-bearing assumptions | **Complete 2026-09-03** — see [phase-0-findings.md](phase-0-findings.md) |
 | **1** ✅ | Land the spec, settle the record | **Complete 2026-09-03** — v7.md + provenance/amendment block · CHANGELOG · ADR 0007–0013 · 0003/0005/0006 marked superseded · [annex A](annex-read-only.md) · v6 skills deleted · README banner |
-| **2a** ✅ | Engine core, part 1 — config + sources | **Complete 2026-09-03** — `engine/{yaml_lite,config,sources}.py`, 28 passing tests, `engine/config.example.yaml` (byte-identical §20 extraction). End-to-end smoke reproduces R=4 through real code. |
-| **2b** | Engine core, part 2 — macro, patterns, gates | `engine/{macro,patterns,gates}.py` + tests |
+| **2** ✅ | Engine core — config, sources, macro, patterns, gates | **Complete 2026-09-03** — `engine/{yaml_lite,config,sources,priceseries,macro,patterns,gates}.py`, 99 passing tests. Built in two checkpoints (2a: config+sources; 2b: macro/patterns/gates, one module per commit) so a tight usage window never risked losing uncommitted work. Every S6/S10/S12.1 threshold traces to `config.example.yaml`; R=4 reproduced against live data; the real Phase 0 CRM quote and the project's own historical INTU/CRWD data both replay correctly through the engine. |
 | **3** | Engine quant — pricing, sizing, feasibility | `engine/{optmodel,sizing,portfolio}.py` + tests · `min_feasible_nav` in every reject path |
 | **4** | State plane and calibration ledger | `state/{watchlist,macro-latest,calibration}.json` · schema doc · seed watchlist re-verified per §5 |
 | **5** | Three skills | `.claude/skills/{weekly-review,daily-screen,bench-check}/SKILL.md` · dry-run against a frozen fixture day |
