@@ -139,7 +139,7 @@ Sunday, when nothing it needs is live-quoted.
 
 | Phase | Deliverable | Exit criteria |
 |---|---|---|
-| **0** | Verify load-bearing assumptions | Cloud connector access confirmed · NAV + positions reachable from cloud · both data gaps resolved or scoped |
+| **0** ✅ | Verify load-bearing assumptions | **Complete 2026-09-03** — see [phase-0-findings.md](phase-0-findings.md) |
 | **1** | Land the spec, settle the record | `framework/v7.md` · CHANGELOG · ADR 0007–0013 · `docs/annex-read-only.md` · v6 skills deleted |
 | **2** | Engine core — config, macro, patterns, gates | `engine/{config,sources,macro,patterns,gates}.py` + tests · `state/config.yaml` |
 | **3** | Engine quant — pricing, sizing, feasibility | `engine/{optmodel,sizing,portfolio}.py` + tests · `min_feasible_nav` in every reject path |
@@ -148,10 +148,24 @@ Sunday, when nothing it needs is live-quoted.
 | **6** | Cloud routines and release step | 2 routines live · `scripts/release.py` · first unattended weekly + daily observed end to end |
 | **7** | Migrate the public plane | `sanitize.py` v2 + leak tests · `render_email.py` · `app/lib/data.ts` · v7 demo days · legacy-mode rendering |
 
-**Phase 0.** One throwaway cloud routine calling `get_accounts` and `get_portfolio`, writing a
-one-line result, then deleted. Re-confirms the 2026-07-10 smoke test and additionally proves
-NAV and position inventory are reachable from the cloud — §0's hard precondition, which the
-original test never covered.
+**Phase 0 — complete 2026-09-03.** Cloud execution PASSES: a routine reached Robinhood with no
+laptop involved, connectors auto-attached without manual wiring, and NAV is retrievable there.
+Three consequences for later phases, detailed in [phase-0-findings.md](phase-0-findings.md):
+
+- **A high-severity defect was found.** `get_accounts` returns 5 accounts and `get_portfolio`
+  requires one to be named; the test agent chose an empty account. NAV = 0 makes `N_max = 0`
+  for every candidate at every structure, so the system would emit a correct-looking `NO TRADE`
+  on every name forever. The account must be **configured, not inferred**, and a zero or absent
+  NAV must hard-fail as `NO TRADE — DATA INSUFFICIENT` rather than flow into §13.3.
+- **Massive is absent from cloud routines** (not a claude.ai connector). The cloud daily path
+  runs on **Robinhood + FRED only**; breadth and §17's option backtest become desktop-cadence
+  jobs writing cached state the routine reads.
+- **Benzinga is a paid tier (403)**, so NTM estimate revisions have no source and §10 patterns
+  2 and 3 are unimplementable as specified. Needs a ruling before Phase 2.
+
+Robinhood's option quote carries every §12 input — bid/ask, sizes, strike-specific IV, all five
+Greeks, OI and quote timestamp — and a live CRM Jan-2028 quote reproduced the §3 feasibility
+table to within $20/contract.
 
 **Phase 2.** §20's YAML becomes the only place any threshold exists; the spec prose and the
 code both read it, which is what makes §21's version control enforceable. Standard library
