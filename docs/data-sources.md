@@ -50,10 +50,12 @@ eps_estimate_analyst_count                    24.0000
 revenue_estimate_average              73,198,447,680
 ```
 
-This is better than the fallback the plan assumed. §10's quiet-inflection test
-(`≥ +5%` over 60 days) and breakout test (`≥ +10%` over 60 days) become a direct computation —
-`eps_estimate_average / eps_estimate_average_60_days_ago − 1` — with **no 60-day
-self-recording wait**. Both patterns come online in Phase 2 rather than two months after launch.
+This is better than the fallback the plan assumed: the 60-day baseline §10 needs is served
+directly, so quiet-inflection (`≥ +5%`) and breakout (`≥ +10%`) need **no 60-day self-recording
+wait** and both patterns come online in Phase 2 rather than two months after launch.
+
+The computation is *not* the naive `current / 60_days_ago − 1` on a single record, however —
+see the construction rules below, which were corrected against the live key.
 
 ### How NTM must actually be constructed (corrected 2026-09-03 against the live key)
 
