@@ -206,23 +206,49 @@ that the run happened, and its absence is the alarm.
 
 ## 7. Open items
 
-None blocks the build; all three need a ruling before the first live run.
+**All three Phase 0 gaps are now closed** — see [data-sources.md](data-sources.md) for the
+verification record. Summary of the resolutions:
 
-**Estimate revisions — degrade honestly, then recover.** §10's quiet-inflection pattern needs
-NTM revenue or EPS revision ≥ +5% over 60 days; breakout needs ≥ +10%. §3 requires a named
-institutional provider, timestamped. Phase 0 establishes whether Benzinga's earnings endpoint
-returns *historical estimate snapshots* or only current values. If only current, start
-recording our own series from day one and mark both patterns `UNAVAILABLE — insufficient
-estimate history` until 60 days exist — §3's own non-disclosure logic applied to a pattern
-instead of a company. Both patterns then come online automatically two months after launch.
+**Estimate revisions — SOLVED.** Alpha Vantage's `EARNINGS_ESTIMATES` serves
+`eps_estimate_average_60_days_ago` alongside the current consensus, which is §10's baseline
+delivered directly. Both quiet-inflection (≥+5%/60d) and breakout (≥+10%/60d) become a
+one-line computation with **no 60-day self-recording wait**, so both patterns ship in Phase 2.
+Free key required; belongs to weekly Stage A because of rate limits. Supersedes the
+degrade-and-recover plan and removes the need for the Benzinga tier.
 
-**Breadth — fail closed, and log the deviation.** §6.1's equity-deleveraging gate ANDs VIX ≥ 32,
-S&P ≥10% below its 200-DMA, and NYSE breadth < 35%. With no breadth source the gate can never
-fire, turning a systemic-risk stop into a silent no-op. Both fixes: compute S&P 500 breadth
-from Massive daily aggregates into a cached rolling matrix, recorded as an `[ASSUMPTION]`
-deviation from "NYSE" per §2; and until that lands, treat the gate as **ACTIVE** whenever the
-other two conditions hold and breadth is unknown. Fail-closed on a systemic gate is the only
-defensible default — ADR 0012 plus a §21 entry.
+**Breadth — resolved by gating rather than a new source.** §6.1's equity-deleveraging gate ANDs
+three conditions and the other two (VIX ≥32 for two closes; S&P ≥10% below its 200-DMA) are
+keyless from FRED and cloud-reachable. Breadth is consulted **only when both already fire**, so
+the daily cloud routine evaluates the cheap pair itself and escalates to desktop-maintained
+`state/breadth.json` — or ADR 0012's fail-closed rule — only in that rare state. No free
+breadth API exists; the published sources are websites, not endpoints.
+
+**§6.2 percentile history — SOLVED by splitting the two uses.** FRED caps ICE BofA series at
+~3 years on every public path (a licensing limit, not a parameter error). Keep
+`BAMLH0A0HYM2` for §6.1's *absolute* gate, which needs only a current level and a 20-day change;
+use **`BAA10Y`** (keyless, 10,167 obs back to 1986) for §6.2's *percentile* component. Logged as
+an `[ASSUMPTION]` per §2 with a §21 entry — investment-grade is defensible as a percentile
+input, not as a level input.
+
+**Also settled in Phase 0:**
+
+- **Robinhood option Greeks and IV — confirmed present.** Live quotes carry strike-specific
+  `implied_volatility` and all five Greeks, so §12.1's local-outlier test and §12.3's surface
+  are implementable. Where a fitted surface is not obtainable, `σj_exit` is an explicit
+  `[ASSUMPTION]` with a documented parameterization, never a silent flat-IV shortcut (§12.2).
+- **The 30-minute marketable-limit test** (§12.1) has no read-only implementation. Robinhood's
+  `high_fill_rate_buy_price` / `low_fill_rate_buy_price` are a partial stand-in; modelled,
+  flagged as an assumption, revisited against real fills under §17.7.
+- **CAPE — solved.** multpl.com exposes Shiller's full monthly series (1,867 rows to 1871).
+
+**Remaining human actions:** a free [Alpha Vantage key](https://www.alphavantage.co/support/#api-key)
+(required — unblocks two entry patterns) and, optionally, a free FRED API key. Neither goes in
+`mcp_connections`; both are plain HTTPS.
+
+**Governing principle established:** prefer a keyless or keyed HTTPS endpoint over an MCP
+connector for anything on the daily path. MCP connectors do not reliably reach cloud routines
+(proved by Massive); Robinhood stays on MCP only because its chain, NAV and positions have no
+public HTTP equivalent.
 
 **Also settled in Phase 0:**
 
