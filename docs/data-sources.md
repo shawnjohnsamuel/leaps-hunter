@@ -1,6 +1,6 @@
 # Data sources — what's available, verified, and free
 
-**Verified:** 2026-09-03 · Companion to [phase-0-findings.md](phase-0-findings.md)
+**Verified:** 2026-09-03 (re-verified with live API keys) · Companion to [phase-0-findings.md](phase-0-findings.md)
 
 Every row below was tested by calling it, not read off a docs page. This project has twice been
 burned by endpoints that are *listed* but return 403 (Massive's option chains, Massive's
@@ -23,7 +23,7 @@ positions and NAV, which have no public HTTP equivalent.
 |---|---|---|---|---|
 | **FRED** `fredgraph.csv` | none | yes | ✅ 9 series | §6.1 gates, §6.2 R, risk-free rate |
 | **multpl.com** (Shiller CAPE) | none | yes | ✅ 1,867 monthly rows to 1871 | §6.2 `cape_gt_95pct` |
-| **Alpha Vantage** `EARNINGS_ESTIMATES` | free key | yes | ✅ via public demo key | **§10 patterns 2 & 3** |
+| **Alpha Vantage** `EARNINGS_ESTIMATES` | free key | yes | ✅ live key, CRM | **§10 patterns 2 & 3** |
 | **SEC EDGAR** XBRL `companyconcept` | none (UA required) | yes | ✅ | §8 retention/RPO, §11 fundamentals |
 | **Robinhood MCP** | connector | yes | ✅ auto-attaches | live chain, Greeks, IV, OI, NAV, positions |
 | **Massive** grouped daily | connector | **no** | ✅ 12.5k tickers/call | breadth (desktop cadence) |
@@ -55,15 +55,40 @@ This is better than the fallback the plan assumed. §10's quiet-inflection test
 `eps_estimate_average / eps_estimate_average_60_days_ago − 1` — with **no 60-day
 self-recording wait**. Both patterns come online in Phase 2 rather than two months after launch.
 
-NTM is constructed by summing the next four *fiscal quarter* records and doing the same on the
-`_60_days_ago` column, so the revision is measured on a true next-twelve-months basis rather
-than a fiscal-year one. `eps_estimate_analyst_count` supports §2's `[FACT]` labeling
-requirement (named, counted, dated).
+### How NTM must actually be constructed (corrected 2026-09-03 against the live key)
 
-Two caveats to encode: revenue estimates carry **no** `_60_days_ago` field, so the 60-day
-revision must run on EPS — §10 permits this ("revenue **or** EPS" for quiet inflection,
-"FCF/EPS" for breakout). And the free tier is rate-limited, so this belongs to **weekly Stage A**
-(15–25 names, once a week), never the daily screen. Confirm current limits at signup.
+An initial reading of this endpoint suggested summing the next four *fiscal quarter* records.
+**That is wrong and would silently corrupt §10.** Testing with the real key established three
+constraints:
+
+1. **The `estimates` array includes historical periods.** Sorting ascending and taking the
+   first four yields quarters from 2017. Records must be filtered to `date > today` first.
+2. **Forward quarters are sparse.** CRM exposes only *two* forward fiscal quarters, so a
+   four-quarter sum is frequently impossible. The **fiscal-year records are dense and both
+   carry `_60_days_ago`**, so NTM is built as a time-weighted FY1/FY2 blend:
+
+   ```
+   w    = days_until(FY1_end) / 365          # clamped to [0, 1]
+   NTM  = w * FY1 + (1 - w) * FY2            # same formula on the _60_days_ago column
+   ```
+
+   Worked example, CRM on 2026-09-03: FY1 2027-01-31 EPS 14.6707 (14.1275 sixty days ago),
+   FY2 2028-01-31 EPS 15.5560 (15.5139), `w = 0.411` → NTM 15.1922 vs 14.9441 →
+   **+1.66%**. Below both thresholds, so CRM fails quiet-inflection and breakout today.
+3. **Rate limiting is aggressive.** Two rapid requests triggered a throttle; the guidance is
+   **1 request per second**. Pace the calls, and confirm the daily cap.
+
+Revenue estimates carry **no** `_60_days_ago` field, so the 60-day revision runs on EPS — §10
+permits this ("revenue **or** EPS" for quiet inflection, "FCF/EPS" for breakout).
+`eps_estimate_analyst_count` (CRM: 25 on FY1, 52 on FY2) supports §2's `[FACT]` labeling.
+
+A name with fewer than two forward fiscal years, or a null on either side of the blend, is
+`UNAVAILABLE` for these patterns — **never a fail**. §3 makes an unobtainable required metric a
+disqualification from the affected class, not a passing score, and the distinction matters:
+"we cannot measure it" and "it did not improve" must not collapse into the same verdict.
+
+Rate limits confine this to **weekly Stage A** (15–25 names, once a week, paced). Never the
+daily screen.
 
 ### 2. Breadth — resolved by gating, not by a new source
 
@@ -89,9 +114,11 @@ practice.
 
 ### 3. §6.2 percentile history — SOLVED by a long-history proxy
 
-FRED caps ICE BofA series at ~3 years on every public download path (`cosd=1996-12-31` still
-starts 2023-09-04; the `.txt` feed returns HTML). That is an ICE licensing limit, not a
-parameter mistake, and 787 observations cannot support a 20th-percentile claim.
+FRED caps ICE BofA series at ~3 years on every path (`cosd=1996-12-31` still starts
+2023-09-04; the `.txt` feed returns HTML). **Confirmed 2026-09-03 with an authenticated key:**
+the keyed JSON API returns `count=795` for `BAMLH0A0HYM2`, identical to the anonymous CSV,
+while `BAA10Y` returns 10,609 on the same call. The limit is ICE licensing, not authentication
+— a key does not lift it, and 795 observations cannot support a 20th-percentile claim.
 
 Split the two uses:
 
@@ -132,8 +159,10 @@ more than it supports.
 
 1. **Alpha Vantage API key** — <https://www.alphavantage.co/support/#api-key>. Unblocks §10
    patterns 2 and 3. Store outside the repo, alongside the existing gitignored `.local` files.
-2. **FRED API key** *(optional)* — <https://fredaccount.stlouisfed.org/apikeys>. Only needed if
-   full ICE BofA history is wanted instead of the `BAA10Y` proxy; the proxy is sufficient.
+2. **FRED API key** — <https://fredaccount.stlouisfed.org/apikeys>. **Held; note it does *not*
+   unlock ICE BofA history** (tested — same 795 rows as anonymous). Retained because the keyed
+   JSON API gives cleaner pagination, units and vintage metadata than scraping CSV. The
+   `BAA10Y` substitution for §6.2 stands on its own merits, not as an auth workaround.
 
 Neither key belongs in `mcp_connections`. Both are plain HTTPS and reach the cloud routine as
 environment variables or a mounted secret.

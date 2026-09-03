@@ -26,7 +26,9 @@ path.** MCP is reserved for what has no public HTTP equivalent. Specifically:
 
 Two series decisions inside FRED:
 - §6.1's **absolute** credit gate keeps `BAMLH0A0HYM2`. FRED caps ICE BofA series at ~3 years
-  on every public path, which is ample for a current level and a 20-day change.
+  on every path — **confirmed with an authenticated key on 2026-09-03: the keyed JSON API
+  returns the same 795 observations as the anonymous CSV, so this is ICE licensing and not an
+  auth limit.** Three years is ample for a current level and a 20-day change.
 - §6.2's **percentile** component uses `BAA10Y` (10,167 observations back to 1986). Recorded as
   an `[ASSUMPTION]` per §2 with a §21 entry: investment-grade is defensible as a percentile
   input, not as a level input.
