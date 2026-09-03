@@ -141,7 +141,8 @@ Sunday, when nothing it needs is live-quoted.
 |---|---|---|
 | **0** ✅ | Verify load-bearing assumptions | **Complete 2026-09-03** — see [phase-0-findings.md](phase-0-findings.md) |
 | **1** ✅ | Land the spec, settle the record | **Complete 2026-09-03** — v7.md + provenance/amendment block · CHANGELOG · ADR 0007–0013 · 0003/0005/0006 marked superseded · [annex A](annex-read-only.md) · v6 skills deleted · README banner |
-| **2** | Engine core — config, macro, patterns, gates | `engine/{config,sources,macro,patterns,gates}.py` + tests · `state/config.yaml` |
+| **2a** ✅ | Engine core, part 1 — config + sources | **Complete 2026-09-03** — `engine/{yaml_lite,config,sources}.py`, 28 passing tests, `engine/config.example.yaml` (byte-identical §20 extraction). End-to-end smoke reproduces R=4 through real code. |
+| **2b** | Engine core, part 2 — macro, patterns, gates | `engine/{macro,patterns,gates}.py` + tests |
 | **3** | Engine quant — pricing, sizing, feasibility | `engine/{optmodel,sizing,portfolio}.py` + tests · `min_feasible_nav` in every reject path |
 | **4** | State plane and calibration ledger | `state/{watchlist,macro-latest,calibration}.json` · schema doc · seed watchlist re-verified per §5 |
 | **5** | Three skills | `.claude/skills/{weekly-review,daily-screen,bench-check}/SKILL.md` · dry-run against a frozen fixture day |
