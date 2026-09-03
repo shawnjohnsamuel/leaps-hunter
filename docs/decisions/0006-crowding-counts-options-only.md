@@ -1,6 +1,10 @@
 # ADR 0006: Portfolio-crowding gate counts only options/LEAPS positions
 
-**Status:** accepted (2026-07-08, after screener run 1)
+**Status:** ~~accepted (2026-07-08, after screener run 1)~~ — **SUPERSEDED by
+[ADR 0009](0009-nav-caps-replace-correlation-gate.md)** on 2026-09-03 during the v7 migration:
+v7 §14 NAV caps and §15 portfolio tests replace the correlation gate entirely. Retained as
+design history; the reasoning below explains why the rule existed, which the superseding ADR
+builds on.
 
 ## Context
 v6 §5.9 as first written rejected any new position when "≥2 existing positions already
