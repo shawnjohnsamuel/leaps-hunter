@@ -1,6 +1,8 @@
 # ADR 0003: Hard delta floor at ≥60Δ (auto-reject below)
 
-**Status:** accepted (2026-07-08)
+**Status:** ~~accepted (2026-07-08)~~ — **SUPERSEDED by [ADR 0007](0007-delta-policy-supersedes-hard-floor.md)** on
+2026-09-03 during the v7 migration: v7 §13.1 replaces the categorical floor with a calibrated delta policy. Retained as design history; the reasoning
+below explains why the rule existed, which the superseding ADR builds on.
 
 ## Context
 The framework's identity is deep-ITM survivability ("THE DVN LESSON"), yet neither parent
