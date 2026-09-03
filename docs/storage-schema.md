@@ -1,4 +1,11 @@
-# Storage schema
+# Storage schema (v6.1 — superseded)
+
+> ⚠️ **Superseded by [`storage-schema-v7.md`](storage-schema-v7.md)** as of 2026-09-03. This
+> document describes the shapes `daily-screener`/`quick-eval` produced under framework v6.1
+> — regime verdict, named thesis, tiered candidates. v7 has no regime verdict or thesis object;
+> its shapes are the `state/*.json` files documented in the v7 schema doc. Retained as design
+> history and because `data-demo/` still ships v6-shaped synthetic examples pending their own
+> migration (plan Phase 7).
 
 Every daily run writes to the **private** data repo (`leaps-hunter-data`, see ADR 0002):
 

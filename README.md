@@ -69,6 +69,8 @@ public-data/daily/*.json (this repo)
 | [app/](app/) | Take the LEAP — Next.js site (Vercel) |
 | [data-demo/](data-demo/) | Synthetic sample days (fictional tickers) covering every report type |
 | [.claude/skills/](.claude/skills/) | v6 skills retired in the v7 migration; `weekly-review`, `daily-screen` and `bench-check` land in Phase 5 |
+| [engine/](engine/) | The v7 deterministic core (Phases 2-3) — config, sources, macro, patterns, gates, optmodel, sizing, portfolio. 155 tests, zero third-party dependencies |
+| [docs/storage-schema-v7.md](docs/storage-schema-v7.md) | The v7 state-plane schema (Phase 4) — `state/*.json` in the private repo |
 
 ## Safety and boundaries
 
