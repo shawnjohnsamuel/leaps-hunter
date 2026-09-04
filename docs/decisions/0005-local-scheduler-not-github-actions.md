@@ -1,6 +1,8 @@
 # ADR 0005: Daily automation runs on the Claude desktop scheduler, not GitHub Actions
 
-**Status:** accepted (2026-07-08)
+**Status:** ~~accepted (2026-07-08)~~ — **SUPERSEDED by [ADR 0008](0008-cloud-routines-and-market-hours.md)** on
+2026-09-03 during the v7 migration: cloud routines reach the connectors; the laptop dependency is retired. Retained as design history; the reasoning
+below explains why the rule existed, which the superseding ADR builds on.
 
 ## Context
 The daily screener must run unattended each weekday morning and needs the Robinhood MCP

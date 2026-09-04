@@ -1,0 +1,144 @@
+version: 7.0
+supersedes: [v4.0, v5.0, v6.0, v6.1, v8.0-draft]
+
+portfolio:
+  nav: null                        # REQUIRED — set per deployment, total NAV not sleeve
+  currency: USD
+
+macro_hard_gates:
+  credit_stress:
+    hy_oas_bp_absolute: 550
+    hy_oas_bp_widening_20d: 150
+    hy_oas_bp_widening_floor: 450
+    release_consecutive_closes: 5
+  inflation_duration_shock:
+    real_10y_bp_10d: 40
+    nominal_10y_bp_10d: 35
+    breakeven_5y5y_bp_10d: 20
+    release_consecutive_closes: 5
+    release_fraction_of_trigger: 0.5
+  equity_deleveraging:
+    vix_level: 32
+    vix_consecutive_closes: 2
+    spx_pct_below_200dma: 10
+    breadth_pct_above_200dma: 35
+    release_vix_below: 25
+    release_breadth_above: 45
+    release_consecutive_closes: 5
+
+restricted_regime:
+  components: [cape_gt_95pct, hy_oas_lt_20pct, real_30y_gt_90pct, net_liquidity_contracting]
+  trigger_R: 3
+  score_threshold_normal: 75
+  score_threshold_restricted: 80
+  kelly_multiplier_normal: 0.25
+  kelly_multiplier_restricted: 0.125
+  release_consecutive_weekly_reviews: 2
+  minimum_deployment_floor: none   # PROHIBITED — never set
+
+event_gates:
+  binary_event_blackout_days: 14
+  spread_exception_permitted: false
+  max_ps_if_unprofitable: 50
+
+seat_decay_gate:
+  grr_min_pct: 85
+  crpo_vs_subrev_tolerance_pp: -5
+  crpo_consecutive_failures_to_reject: 2
+  usage_decline_max_pct_consumer: 20
+  usage_decline_max_pct_enterprise: 10
+  nondisclosure_is_pass: false
+
+entry_patterns:
+  panic:
+    drawdown_pct_range: [10, 20]
+    window_sessions: [2, 5]
+    sigma_alternative: 2.0
+    max_ntm_consensus_cut_pct: 5
+  quiet_inflection:
+    accelerating_metrics_min: 2
+    estimate_revision_min_pct_60d: 5
+    relative_underperformance_min_pts: 5
+  breakout:
+    high_lookback_days: [20, 120]
+    max_30d_gain_pct: 20
+    estimate_revision_min_pct_60d: 10
+    max_multiple_expansion_ratio: 0.5
+  bottleneck_expansion:
+    backlog_vs_revenue_growth_min_pp: 15
+    consecutive_reports: 2
+    max_30d_gain_pct: 25
+
+scoring:
+  thesis_fit:            {points: 20, min: 12}
+  mispricing:            {points: 20, min: 12}
+  fundamental_confirm:   {points: 15, min: null}
+  valuation_survival:    {points: 15, min: null}
+  option_implementation: {points: 15, min: 10}
+  positioning:           {points: 5,  min: null}
+  catalyst_path:         {points: 5,  min: 3}
+  invalidation_clarity:  {points: 5,  min: 5}
+
+option_vetoes:
+  dte_range: [365, 900]
+  quote_age_max_seconds: 60
+  quoted_spread_max_pct: 6
+  open_interest_min: 500
+  median_daily_volume_20d_min: 10
+  max_premium_over_fair_value_pct: 10
+
+pricing:
+  entry_slippage_fraction_of_spread: 0.25
+  exit_spread_haircut_fraction: 0.5
+  exit_width_penalty_fraction: 0.25
+  exit_stress_iv_coefficient: 0.50
+  exit_stress_drawdown_coefficient: 0.50
+  exit_stress_drawdown_threshold: 0.90
+
+acceptance:
+  ev_net_min: 0.0
+  ev_to_expected_loss_min: 0.50
+  robust_log_growth_min: 0.0
+
+delta_policy:
+  hard_gate_active: none
+  restricted: [0.70, 0.85]
+  normal: [0.60, 0.85]
+  convexity_exception: [0.55, 0.70]     # requires variance + ES tests
+  below_0_55: prohibited_unless_validated_template
+
+spread_rule:
+  mandated: false
+  max_prob_above_short_strike: 0.25
+
+sizing:
+  kelly_posterior_draws_min: 10000
+  f_robust_quantile: 0.10
+  full_kelly_permitted: false
+  caps_pct_of_nav:
+    single_itm_or_spread: 1.25
+    single_atm_convexity: 0.75
+    unvalidated_setup: 0.25
+    single_issuer: 1.50
+    single_mechanism: 3.00
+    total_leaps_book: 8.00
+  min_comparable_observations_for_normal_size: 50
+
+portfolio_risk:
+  horizon_trading_days: 21
+  require_variance_non_increasing: true
+  require_es95_non_increasing: true
+
+management:
+  recover_capital_at_gain_pct: [100, 150]
+  recover_capital_fraction: 0.50
+  trim_at_gain_pct: [200, 400]
+  trim_fraction: 0.25
+  reassess_months: 6
+  roll_window_dte: [270, 365]
+  exit_on_price_alone: false
+
+watchlist:
+  target_size: [15, 25]
+  mechanisms: [bottleneck, control_plane, narrative_reversal, sanctioned_secondary]
+  saaspocalypse_as_core_mechanism: false

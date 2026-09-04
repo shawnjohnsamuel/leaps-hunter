@@ -1,5 +1,12 @@
 # LEAPS Hunter · Take the LEAP
 
+> ⚠️ **Migrating to framework v7.0** (started 2026-09-03, branch `v7-migration`). v7 replaces
+> v6 wholesale — mechanism taxonomy instead of named theses, arithmetic macro gates, an
+> executable option model, and robust fractional Kelly sizing. Much of the description below
+> still reflects the shipped v6 system and is updated as each phase lands. See the
+> [migration plan](docs/v7-migration-plan.md).
+
+
 A disciplined, AI-assisted options-screening system that hunts for deep-ITM, long-dated
 LEAPS calls on large-cap quality names caught in **panic-driven (not fundamental)
 selloffs** — and, on most days, correctly recommends **nothing at all**. Its public face
@@ -25,7 +32,8 @@ would-be trade:
 
 - Asymmetry comes from mispricing, not momentum — buy panic, never euphoria.
 - Multiple independent catalysts beat any single dependency.
-- Survivability (deep ITM, ≥60Δ hard floor, long duration) beats maximum leverage.
+- Survivability beats maximum leverage — structure emerges from the net-return and
+  portfolio-risk model, bounded by delta guardrails ([ADR 0007](docs/decisions/0007-delta-policy-supersedes-hard-floor.md)).
 - Macro acts as a **veto, never as points** ([ADR 0001](docs/decisions/0001-macro-as-veto-not-additive-points.md)).
 - **The modal correct output is zero trades**, reported in full — never silence.
 
@@ -49,7 +57,9 @@ public-data/daily/*.json (this repo)
 
 | Path | What it is |
 |---|---|
-| [framework/v6.md](framework/v6.md) | The operating spec (v6.1) — gates, scoring bands, tool contract |
+| [framework/v7.md](framework/v7.md) | **The governing spec (v7.0)** — mechanisms, macro gates, entry patterns, option model, Kelly sizing |
+| [framework/v6.md](framework/v6.md) | The previous production spec (v6.1), superseded — kept as design history |
+| [docs/annex-read-only.md](docs/annex-read-only.md) | Operating annex A — the enumerated read-only tool contract (binding) |
 | [framework/v4.md](framework/v4.md) / [v5.md](framework/v5.md) | The two predecessor frameworks, preserved as design history |
 | [docs/audit-v4-vs-v5.md](docs/audit-v4-vs-v5.md) | The head-to-head audit that justified v6 |
 | [docs/decisions/](docs/decisions/) | ADRs — including two written *after* production runs changed the rules |
@@ -58,7 +68,9 @@ public-data/daily/*.json (this repo)
 | [public-data/](public-data/) | Sanitized daily artifacts — the only screener output that exists publicly |
 | [app/](app/) | Take the LEAP — Next.js site (Vercel) |
 | [data-demo/](data-demo/) | Synthetic sample days (fictional tickers) covering every report type |
-| [.claude/skills/](.claude/skills/) | `daily-screener` (runs v6 end-to-end) and `quick-eval` (gate-check) |
+| [.claude/skills/](.claude/skills/) | v6 skills retired in the v7 migration; `weekly-review`, `daily-screen` and `bench-check` land in Phase 5 |
+| [engine/](engine/) | The v7 deterministic core (Phases 2-3) — config, sources, macro, patterns, gates, optmodel, sizing, portfolio. 155 tests, zero third-party dependencies |
+| [docs/storage-schema-v7.md](docs/storage-schema-v7.md) | The v7 state-plane schema (Phase 4) — `state/*.json` in the private repo |
 
 ## Safety and boundaries
 

@@ -1,0 +1,51 @@
+{
+  "_note": "Phase 5's frozen fixture day. Every input below is a real value captured live on 2026-09-03 -- not synthesized -- so this file lets daily-screen's documented procedure be replayed and checked without new network calls. See engine/tests/test_daily_screen_dry_run.py.",
+  "as_of": "2026-09-02",
+  "macro": {
+    "hy_oas_now_pct": 2.66,
+    "hy_oas_20d_ago_pct": 2.60,
+    "real10_delta_10d": 0.0,
+    "nominal10_delta_10d": 0.0,
+    "breakeven_delta_10d": 0.0,
+    "vix_now": 15.20,
+    "vix_prev": 16.34,
+    "spx_pct_below_200dma": 7.50,
+    "cape_now": 99,
+    "credit_percentile_now": 10,
+    "real30_now": 99,
+    "liquidity_contracting": true,
+    "_source": "engine.sources fetch_fred_series/fetch_cape_series, captured 2026-09-03. cape/credit/real30 are percentile-rank inputs already reduced to a rank comparable to the R throttle's >95/<20/>90 thresholds, matching the live run's actual result (R=4) rather than the raw series values."
+  },
+  "expected_macro_result": {
+    "credit_stress_active": false,
+    "inflation_duration_shock_active": false,
+    "equity_deleveraging_active": false,
+    "R": 4,
+    "restricted": true,
+    "score_threshold": 80,
+    "kelly_multiplier": 0.125
+  },
+  "candidate": {
+    "ticker": "CRWD",
+    "mechanism": "M2",
+    "days_to_next_binary_event": 89,
+    "closes": [173.2275,169.8725,170.74,171.215,168.86,170.23,168.255,169.6625,175.2725,185.7275,
+               190.785,193.185,193.98,199.38,194.62,191.12,198.4,187.18,187.91,210.73,206.77,203.76,
+               203.08,198.49,191.15,188.42,183.42,183.28,180.11,181.8,179.38,185.22,190.86,202.54,
+               211.22,209.86,207.39,214.42,225.16,221.9,221.78,225.53,216.95,213.9,212.92,201.63,
+               190.34,191.95,190.68,185.38,189.18,227.96,218.4,231.0,215.07,203.42],
+    "_closes_source": "Robinhood get_equity_historicals, CRWD, 2026-06-15 through 2026-09-02, captured 2026-09-03",
+    "ntm_eps_now": 1.4300164383561644,
+    "ntm_eps_60d_ago": 1.42593698630137,
+    "ntm_revision_pct": 0.28608922371637924,
+    "ntm_analyst_count": 52,
+    "_ntm_source": "Alpha Vantage EARNINGS_ESTIMATES, CRWD, live key, captured 2026-09-03 -- see docs/data-sources.md for the FY1/FY2 blend construction"
+  },
+  "expected_candidate_result": {
+    "binary_event_gate_passed": true,
+    "panic_pattern_qualifies": true,
+    "panic_pattern_confirmed": true,
+    "panic_pattern_clears": true,
+    "note": "S11 scoring, S12.1 liquidity vetoes, S12-14 pricing/sizing were NOT run for this fixture -- they need a live option-chain pull and judgment-scored inputs this frozen fixture deliberately does not fabricate. This fixture validates the S7 gate + S10 pattern chain only."
+  }
+}
