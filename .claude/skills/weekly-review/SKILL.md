@@ -13,6 +13,12 @@ a threshold in prose. If anything here disagrees with `v7.md` or `state/config.y
 **Cadence:** weekly, before the first `daily-screen` session of the week. **Discovery happens
 here, never in `daily-screen`** (§4.2) — this is the primary defense against overtrading.
 
+**This skill is cloud-safe and reads macro/NTM state; it never fetches it.** The macro hard-gate
+refresh and the Alpha Vantage NTM refresh are a separate skill, **`macro-refresh`**, run from a
+desktop session — FRED, Alpha Vantage, and multpl.com are unreachable from a cloud routine
+(confirmed 2026-09-04, `docs/decisions/0014-macro-fetch-desktop-only.md`). Run `macro-refresh`
+at least weekly, ideally right before this skill, so its kill-switch/§8 work has fresh context.
+
 ## Setup
 
 1. Locate the private data repo's checkout directly — `find / -maxdepth 4 -iname "leaps-hunter-data" -type d` in a cloud routine (it's always a sibling checkout, one of the routine's own `sources`), or ask the user once for the local path in a desktop session. **Never write a `.local` pointer file to resolve this** — a 2026-09-04 cloud run found the harness's sensitive-file classifier flags any `.claude/*.local` write for interactive approval, and an unattended routine has no one to approve it; the run hangs before it can ever send its own failure notification. All state files below live under `<data-path>/state/`.
@@ -20,29 +26,26 @@ here, never in `daily-screen`** (§4.2) — this is the primary defense against 
    threshold exists (ADR 0010). Never hardcode a number that's in this file.
 3. Load `state/watchlist.json` and `state/macro-latest.json` for prior state.
 
-## 1. Macro hard-gate status and the R throttle (§6.1, §6.2)
+## 1. Macro hard-gate status and the R throttle (§6.1, §6.2) — READ ONLY in a cloud run
 
-Pull fresh series and feed them straight into `engine.macro` — do not re-derive the arithmetic:
+**Do not attempt to fetch FRED, Shiller CAPE, or any of §6's macro series from a cloud
+routine.** A 2026-09-04 diagnostic confirmed `fred.stlouisfed.org`, `www.alphavantage.co`, and
+`www.multpl.com` are unreachable from this sandbox — both raw HTTP and the `WebFetch` tool
+return an explicit `EGRESS_BLOCKED` error for all three hosts. This is a fixed network policy,
+not a bug; see `docs/decisions/0014-macro-fetch-desktop-only.md`. That refresh is now a separate
+skill, **`macro-refresh`**, run from a desktop session on its own cadence.
 
-| Series | Source | Function |
-|---|---|---|
-| HY OAS (`BAMLH0A0HYM2`) | `engine.sources.fetch_fred_series` | §6.1 absolute credit gate |
-| BAA10Y | `engine.sources.fetch_fred_series` | §6.2 percentile input (ADR 0011 — FRED caps ICE BofA at ~3y regardless of key) |
-| Real/nominal 10Y, 5y5y breakeven | `fetch_fred_series("DFII10")`, `("DGS10")`, `("T5YIFR")` | §6.1 inflation-shock gate |
-| DFII30 | `fetch_fred_series` | §6.2 real-30y percentile |
-| WALCL, WTREGEN, RRPONTSYD | `fetch_fred_series` each | `engine.macro.net_liquidity_series` / `net_liquidity_contracting` |
-| Shiller CAPE | `engine.sources.fetch_cape_series` | §6.2 CAPE percentile |
-| VIX, SPX (+ 200-DMA) | `fetch_fred_series("VIXCLS")`, `("SP500")` | §6.1 equity-deleveraging gate (the two cheap conditions) |
-| Breadth | `state/macro-latest.json`'s `breadth` block | Only consulted if VIX+SPX both fire (ADR 0012); if stale, treat as unknown and fail closed |
+In this skill, just **read** `state/macro-latest.json` and check its `as_of` date:
+- **≤7 days old** — use it as-is for the regime check below.
+- **>7 days old** — still use it (never block the whole run on this), but flag it prominently
+  and near the top of your output: `⚠️ MACRO STATE STALE (as_of: <date>) — run macro-refresh`.
+  This is the same "flag loudly, don't fabricate, don't halt" pattern `bench-check` already
+  uses for its own staleness check.
 
-For each of the three §6.1 gates, compute today's trigger/release booleans with the matching
-`engine.macro.*_trigger` / `*_release_met` function, then call `engine.macro.step_hard_gate`
-with yesterday's `HardGateState` (from `state/macro-latest.json`) to get today's state. This is
-a one-step transition, not a replay — see the module's own docstring for why.
-
-Compute `engine.macro.compute_restricted_regime` for `R` and the regime-adjusted score
-threshold / Kelly multiplier. **Write the full result back to `state/macro-latest.json`** —
-this file only has value if every run updates it.
+Read `hard_gates`, `restricted_regime.R`, `restricted_regime.score_threshold`, and
+`restricted_regime.kelly_multiplier` from the file directly — do not recompute them. If any
+`hard_gates.*.active` is `true`, note it for `daily-screen`'s benefit but this skill itself
+takes no action on it (that's Stage B's job).
 
 ## 2. Kill-switch check per active watchlist name (§9)
 
@@ -74,20 +77,24 @@ or `[ASSUMPTION]` per §2:
    never a consumer traffic test on an enterprise workflow vendor, or vice versa).
 4. **Pricing/competitive evidence** — no material concession, win-rate collapse, or confirmed
    AI-driven customer migration.
-5. **Filing/transcript evidence** — an EDGAR semantic diff (`engine.sources.fetch_sec_company_concept`
-   for the underlying XBRL facts) showing no AI-risk escalation *accompanied by* adverse KPIs.
+5. **Filing/transcript evidence** — an EDGAR semantic diff showing no AI-risk escalation
+   *accompanied by* adverse KPIs. **In a cloud routine, use Robinhood's `get_sec_filing_index`
+   / `get_sec_filing_facts` tools, not `engine.sources.fetch_sec_company_concept`** — the
+   latter calls `data.sec.gov` directly, which is blocked by the same egress policy as §1's
+   macro sources (confirmed 2026-09-04). Robinhood's filing tools proxy the same XBRL facts
+   through its own API and are confirmed working from a cloud routine. `fetch_sec_company_concept`
+   remains fine for a desktop session.
 
 **Non-disclosure is a failure, not a pass** — if a name doesn't disclose enough to apply an
 approved proxy, it is `s8_status: "fail"` for the narrative-reversal class, not `"pending"`.
 
-## 4. Estimate-revision refresh (§10 patterns 2 & 3)
+## 4. Estimate-revision refresh (§10 patterns 2 & 3) — READ ONLY in a cloud run
 
-Weekly cadence specifically because of Alpha Vantage's rate limit (confirmed 2026-09-03:
-throttled after two rapid requests; guidance is 1 request/second). For each active name, call
-`engine.sources.fetch_av_earnings_estimates` then `engine.sources.compute_ntm_eps_revision`.
-Store the resulting `NTMResult` (or its `reason` if unavailable) against the watchlist entry —
-`daily-screen` reads this rather than re-fetching it, which is the token-efficiency point of
-splitting Stage A from Stage B in the first place.
+**Do not call Alpha Vantage from a cloud routine** — `www.alphavantage.co` is blocked by the
+same egress policy as §1 (confirmed 2026-09-04). This refresh now lives in the **`macro-refresh`**
+skill, run from a desktop session. Here, just read each name's cached `ntm` field from
+`state/watchlist.json` and use its `as_of` date the same way §1 uses `macro-latest.json`'s —
+flag prominently if stale, never re-fetch, never fabricate a revision figure.
 
 ## 5. Entry-pattern assignment (§10) and invalidation rules (§16)
 
@@ -134,19 +141,17 @@ just token cost.
 
 ## Output
 
-Write `weekly/YYYY-MM-DD.json` (see `docs/storage-schema-v7.md`), update
-`state/watchlist.json` and `state/macro-latest.json` in place, and commit + push in the data
-repo: `git add -A && git commit -m "weekly review YYYY-MM-DD: <one-line summary>" && git push`.
+Write `weekly/YYYY-MM-DD.json` (see `docs/storage-schema-v7.md`), update `state/watchlist.json`
+in place (kill-switch results, §8 verdicts, pattern assignments, retirements/admissions —
+never the `ntm` field, which only `macro-refresh` writes), and commit + push in the data repo:
+`git add -A && git commit -m "weekly review YYYY-MM-DD: <one-line summary>" && git push`.
+Do not touch `state/macro-latest.json` — it's `macro-refresh`'s file now.
 
 ## Cost discipline
 
-- Fetch macro series once per run, not per name — §6's gates and `R` are portfolio-wide, not
-  per-candidate.
 - Batch Robinhood fundamentals/earnings calls across all active names in one request where the
   tool supports it (`get_equity_fundamentals` and `get_equity_quotes` both accept multiple
   symbols).
-- Alpha Vantage: one call per name, paced ≥1 second apart, this session only — never from
-  `daily-screen` or `bench-check`.
 - §8's filing review is the expensive step. Budget it only for names actually flagged M3 and
   not already cleared/failed in a prior review within the last 30 days.
 - The staleness clock (§6) is what makes this scale: a full evidence refresh (news, filings,

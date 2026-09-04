@@ -1,6 +1,11 @@
 # ADR 0011: Prefer HTTPS over MCP on the daily path; FRED is the macro source of record
 
 **Status:** accepted (2026-09-03) · **Does not affect:** [ADR 0004](0004-robinhood-sole-live-chain-source.md)
+· **Amended by:** [ADR 0014](0014-macro-fetch-desktop-only.md) (2026-09-04) — this ADR's claim
+that HTTPS calls "behave identically on the desktop and in the cloud" is **wrong**: FRED, Alpha
+Vantage, multpl.com, and direct SEC EDGAR are all unreachable from a cloud routine's sandbox.
+The source/series selections below remain correct; only the cloud-reachability assumption is
+amended. These fetches are now desktop-only (`macro-refresh` skill).
 
 ## Context
 Phase 0 established that MCP connectors do not reliably reach cloud routines. Massive Market

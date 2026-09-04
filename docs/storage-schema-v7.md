@@ -57,6 +57,7 @@ toward 15 began 2026-09-03 with the staleness/cap-and-replace disciplines below 
 | `evidence` | array of `{claim, type: FACT\|ASSUMPTION, source, as_of}` — §2's labeling, applied literally |
 | `kill_switch` | the §9 mechanism-level kill switch text, plus any name-specific addendum |
 | `kill_switch_check_<date>` | dated result of the most recent kill-switch re-check — always present after the first real `weekly-review` pass on a name, even when the result is "not triggered" |
+| `ntm` | `{available, revision_pct, analyst_count, as_of}` or `{available: false, reason}` — **written only by `macro-refresh`** (ADR 0014; Alpha Vantage is unreachable from a cloud routine). `weekly-review`/`daily-screen`/`bench-check` all read this and flag staleness, never fetch it |
 | `permitted_entry_patterns` | subset of the four §10 patterns judged plausible for this name's mechanism (e.g. M1 names never get `quiet_inflection`; M3 names never get `bottleneck_expansion`) |
 | `s8_status` | `null` \| `"in_progress"` \| `"pass"` \| `"fail"` — only meaningful for M3 names. `"in_progress"` is a real, honest state (not a placeholder): some §8 dimensions clear, at least one is genuinely inconclusive on the evidence gathered so far — see `s8_detail` |
 | `s8_detail` | present once §8 has been run for real: one `[FACT]`/`[ASSUMPTION]`-labeled note per dimension (core retention, forward demand, usage/engagement, pricing/competitive, filing/transcript) |
@@ -73,14 +74,19 @@ dormant `mechanism_ok_no_current_dislocation` status. Full reasoning in
 
 ## `state/macro-latest.json`
 
+**Written only by `macro-refresh`** (desktop-only, ADR 0014 — FRED/CAPE/Alpha Vantage are
+unreachable from a cloud routine's sandbox, confirmed 2026-09-04). `weekly-review` and
+`daily-screen` both only read this file and flag it loudly if its `as_of` is stale; neither
+ever fetches or recomputes it.
+
 Persists [`engine.macro.HardGateState`](../engine/macro.py) per §6.1 gate — `active` and
-`consecutive_release_days` — so the daily routine performs a one-step state transition each
-run rather than replaying history. Breadth has no history to replay against regardless (it
+`consecutive_release_days` — so each refresh performs a one-step state transition rather than
+replaying history. Breadth has no history to replay against regardless (it
 only starts accumulating once a desktop-cadence job first runs, ADR 0012), which is exactly
 why the hard-gate design is incremental for all three gates uniformly, not just the one that
 strictly requires it (see the module's own docstring). Also carries the last
 [`RestrictedRegimeResult`](../engine/macro.py) (§6.2) and a `breadth` block populated by that
-desktop-cadence job (ADR 0012 — Massive Market Data is absent from cloud routines).
+same desktop-cadence job (ADR 0012 — Massive Market Data is absent from cloud routines either).
 
 ## `state/calibration.json`
 
