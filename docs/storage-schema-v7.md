@@ -43,9 +43,11 @@ correct (`engine.sizing.NAVCapInputs`' existing-exposure fields apply the same r
 
 ## `state/watchlist.json`
 
-Stage A's output (§4.1): roughly 15–25 companies, each mapped to exactly one §5 mechanism with
-dated evidence. Currently seeded with the 9 names from §5's own seed list, re-verified — not
-carried forward from the spec's "unverified starting points, not endorsements" — 2026-09-03.
+Stage A's output (§4.1): a **soft target of 15 companies** (25 is a hard ceiling, never a
+target to grow toward — project addition, 2026-09-03, since v7.md's own 15–25 range has no
+mechanism against a bigger list diluting average evidence quality), each mapped to exactly one
+§5 mechanism with dated evidence. Seeded with the 9 names from §5's own seed list; expansion
+toward 15 began 2026-09-03 with the staleness/cap-and-replace disciplines below in place first.
 
 | Field | Notes |
 |---|---|
@@ -54,14 +56,20 @@ carried forward from the spec's "unverified starting points, not endorsements" �
 | `status` | `active` \| `mechanism_ok_no_current_dislocation` \| `gated_binary_event` \| `retired` — a name can be mechanism-eligible without being a current hunting target; status says which |
 | `evidence` | array of `{claim, type: FACT\|ASSUMPTION, source, as_of}` — §2's labeling, applied literally |
 | `kill_switch` | the §9 mechanism-level kill switch text, plus any name-specific addendum |
+| `kill_switch_check_<date>` | dated result of the most recent kill-switch re-check — always present after the first real `weekly-review` pass on a name, even when the result is "not triggered" |
 | `permitted_entry_patterns` | subset of the four §10 patterns judged plausible for this name's mechanism (e.g. M1 names never get `quiet_inflection`; M3 names never get `bottleneck_expansion`) |
-| `s8_status` | `null` \| `"not_yet_evaluated"` \| `"pass"` \| `"fail"` — only meaningful for M3 names; a seed-review pass records the placeholder, not a real §8 clearance |
+| `s8_status` | `null` \| `"in_progress"` \| `"pass"` \| `"fail"` — only meaningful for M3 names. `"in_progress"` is a real, honest state (not a placeholder): some §8 dimensions clear, at least one is genuinely inconclusive on the evidence gathered so far — see `s8_detail` |
+| `s8_detail` | present once §8 has been run for real: one `[FACT]`/`[ASSUMPTION]`-labeled note per dimension (core retention, forward demand, usage/engagement, pricing/competitive, filing/transcript) |
 | `next_earnings` | from Robinhood `get_earnings_results`, checked against §7's 14-day blackout |
-| `verification_depth` | `"phase4_seed"` for the initial pass — a lighter bar than a full weekly Stage A review, which also assigns kill switches with more precision and runs §8 for real on every M3 name |
+| `verification_depth` | `"phase4_seed"` (initial pass, lighter bar) or `"weekly_review_<date>"` (a real evidence pass — news/filings/fundamentals actually pulled that date, not just a kill-switch check) |
+| `mechanism_reverified_through` | `YYYY-MM-DD`, ~75 days past the last real evidence pass (project addition, 2026-09-03). Past this date, the next `weekly-review` must either refresh the name for real or retire it as stale — this is what stops a name coasting indefinitely just because its kill switch never fired |
 
-Watchlist expansion toward 15–25 names, full §8 clearance on the M3 names, and per-name
-kill-switch precision are **ongoing Stage A work** (Phase 5's `weekly-review` skill), not a
-Phase 4 one-time event.
+**Cap-and-replace discipline** (project addition, 2026-09-03): below the 15-name soft target,
+new candidates are admitted outright on the same §5 evidence bar as any existing name. At or
+above 15, admitting one requires retiring the current weakest-evidenced name in the same pass
+— thinnest/oldest evidence, furthest past its `mechanism_reverified_through` date, or longest-
+dormant `mechanism_ok_no_current_dislocation` status. Full reasoning in
+`.claude/skills/weekly-review/SKILL.md` §6.
 
 ## `state/macro-latest.json`
 

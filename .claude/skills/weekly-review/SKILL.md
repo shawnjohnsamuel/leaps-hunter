@@ -101,11 +101,37 @@ Predefine §16's invalidation criteria, catalyst timetable, and profit/roll poli
 
 ## 6. Retirement and universe admission
 
-Retire any name whose mechanism no longer holds (kill switch fired, or the dislocation this
-mechanism targets has closed — e.g. a §10 panic candidate that has fully round-tripped).
-New candidates may be admitted from the dislocation scan or rotation research; each must
-independently earn a §5 mechanism assignment with dated evidence — the watchlist target is
-15–25 names (currently below that; expansion is ongoing, not a one-time event).
+**Evidence-triggered retirement** (unchanged): retire any name whose mechanism no longer holds
+— kill switch fired, or the dislocation this mechanism targets has closed (e.g. a §10 panic
+candidate that has fully round-tripped).
+
+**Staleness clock (project addition, not in v7.md itself — added 2026-09-03 because nothing
+above catches a name that's merely dormant).** Every name carries
+`mechanism_reverified_through: YYYY-MM-DD`, set ~75 days out whenever it gets a real evidence
+pass (not a cursory kill-switch check — an actual pull of fresh news/filings/fundamentals for
+that name). At each `weekly-review`, check every name's date:
+- **Past due** → this review must either give it a real evidence refresh (resetting the clock
+  another ~75 days) or retire it (`status: "retired"`, reason: `"stale -- not reverified"`).
+  Don't let a name coast on evidence from months ago just because its kill switch never fired.
+- **Not yet due** → the cheap kill-switch-only check (§2 above) is sufficient this week; no
+  need to re-pull news/filings for a name that isn't due.
+
+This is what keeps the per-name cost from scaling with list size as the watchlist grows: only
+names near their staleness deadline, or showing live movement, get the expensive full refresh
+any given week.
+
+**Cap-and-replace admission (project addition, same date).** Soft target is **15 names**, not
+the full 15–25 range — treat 15 as where the list should actually sit, with 25 as a hard
+ceiling only, never a target to grow toward. Below 15, admit new candidates outright: each
+must independently earn a §5 mechanism assignment with dated evidence, same bar as every
+existing name.
+
+**At or above 15**, admitting a new name requires **retiring the weakest-evidenced current
+name** in the same pass — never just appending. "Weakest" means: thinnest/oldest dated
+evidence, furthest from its `mechanism_reverified_through` deadline, or a `status` of
+`"mechanism_ok_no_current_dislocation"` that has sat dormant longest. This keeps expansion
+from diluting average evidence quality — the failure mode a bigger list actually risks, not
+just token cost.
 
 ## Output
 
@@ -124,3 +150,8 @@ repo: `git add -A && git commit -m "weekly review YYYY-MM-DD: <one-line summary>
   `daily-screen` or `bench-check`.
 - §8's filing review is the expensive step. Budget it only for names actually flagged M3 and
   not already cleared/failed in a prior review within the last 30 days.
+- The staleness clock (§6) is what makes this scale: a full evidence refresh (news, filings,
+  NTM) is only mandatory for names past `mechanism_reverified_through` or showing live
+  movement. A quiet, not-yet-due name gets the cheap kill-switch check alone. As the list
+  grows toward 15, this tiering is what keeps the review's cost roughly flat rather than
+  linear in list size — don't refresh everything every week just because you can.
