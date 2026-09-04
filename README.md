@@ -1,10 +1,11 @@
 # LEAPS Hunter · Take the LEAP
 
-> ⚠️ **Migrating to framework v7.0** (started 2026-09-03, branch `v7-migration`). v7 replaces
-> v6 wholesale — mechanism taxonomy instead of named theses, arithmetic macro gates, an
-> executable option model, and robust fractional Kelly sizing. Much of the description below
-> still reflects the shipped v6 system and is updated as each phase lands. See the
-> [migration plan](docs/v7-migration-plan.md).
+> ✅ **Migrated to framework v7.0** (2026-09-03 to 2026-09-04, all 7 phases complete). v7
+> replaces v6 wholesale — mechanism taxonomy instead of named theses, arithmetic macro gates,
+> an executable option model, and robust fractional Kelly sizing. The public plane (this
+> section, the dashboard, the email) now runs on v7's schema; the 5 real v6.1 days stay
+> published as a static archive, rendered in legacy mode. See the
+> [migration plan](docs/v7-migration-plan.md) for the full build record.
 
 
 A disciplined, AI-assisted options-screening system that hunts for deep-ITM, long-dated
@@ -63,14 +64,14 @@ public-data/daily/*.json (this repo)
 | [framework/v4.md](framework/v4.md) / [v5.md](framework/v5.md) | The two predecessor frameworks, preserved as design history |
 | [docs/audit-v4-vs-v5.md](docs/audit-v4-vs-v5.md) | The head-to-head audit that justified v6 |
 | [docs/decisions/](docs/decisions/) | ADRs — including two written *after* production runs changed the rules |
-| [docs/storage-schema.md](docs/storage-schema.md) | Private + public data contracts |
-| [scripts/](scripts/) | Sanitizer (allowlist + leak tripwires) and email renderer |
-| [public-data/](public-data/) | Sanitized daily artifacts — the only screener output that exists publicly |
-| [app/](app/) | Take the LEAP — Next.js site (Vercel) |
-| [data-demo/](data-demo/) | Synthetic sample days (fictional tickers) covering every report type |
-| [.claude/skills/](.claude/skills/) | v6 skills retired in the v7 migration; `weekly-review`, `daily-screen` and `bench-check` land in Phase 5 |
-| [engine/](engine/) | The v7 deterministic core (Phases 2-3) — config, sources, macro, patterns, gates, optmodel, sizing, portfolio. 155 tests, zero third-party dependencies |
-| [docs/storage-schema-v7.md](docs/storage-schema-v7.md) | The v7 state-plane schema (Phase 4) — `state/*.json` in the private repo |
+| [docs/storage-schema.md](docs/storage-schema.md) | v6.1 data contracts, superseded — kept as reference for the 5 archived legacy days |
+| [scripts/](scripts/) | Sanitizer v2 (allowlist + leak tripwires, `scripts/tests/` for the leak-test suite) and email renderer, both targeting v7's schema |
+| [public-data/](public-data/) | Sanitized daily artifacts — the only screener output that exists publicly. Currently the 5 real v6.1 archive days; no real v7 day has been published yet |
+| [app/](app/) | Take the LEAP — Next.js site (Vercel). Renders v6.1 and v7 days side by side ("legacy-mode rendering") |
+| [data-demo/](data-demo/) | Synthetic sample days (fictional tickers) covering every report type, both v6.1 and v7 shapes |
+| [.claude/skills/](.claude/skills/) | `weekly-review`, `daily-screen`, `bench-check` (Phase 5), and `macro-refresh` (Phase 6, desktop-only — see [ADR 0014](docs/decisions/0014-macro-fetch-desktop-only.md)) |
+| [engine/](engine/) | The v7 deterministic core — config, sources, macro, patterns, gates, optmodel, sizing, portfolio, scoring. 164 tests, zero third-party dependencies |
+| [docs/storage-schema-v7.md](docs/storage-schema-v7.md) | The v7 schema — both `state/*.json` (private repo) and `public-data/*.json` (Phase 7) |
 
 ## Safety and boundaries
 

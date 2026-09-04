@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "framework_version": "7.0",
+  "date": "2026-10-14",
+  "run_type": "daily_screen",
+  "run_time_note": "FICTIONAL DEMO DATA -- fabricated to illustrate v7's CANDIDATE shape, the rare day something clears every gate through S15. Tickers, prices, and figures are invented; see data-demo/README.md. As of 2026-09-04 (this repo's real timeline) no real candidate has ever cleared -- this file exists purely so the dashboard/email rendering paths for a CANDIDATE day are exercised somewhere.",
+  "macro": {
+    "hard_gates_active": {"credit_stress": false, "inflation_duration_shock": false, "equity_deleveraging": false},
+    "R": 1, "restricted": false, "score_threshold": 75, "kelly_multiplier": 0.25, "as_of": "2026-10-13"
+  },
+  "account_ref": "000000000",
+  "nav_at_run": 50000.00,
+  "watchlist_reviewed": "2026-10-11",
+  "candidates_examined": 5,
+  "candidates_clearing_s7_s10": 2,
+  "candidates_clearing_s11": 1,
+  "per_name": {
+    "VLTC": {
+      "mechanism": "M1", "fail_category": "cleared",
+      "binary_event_gate": true, "panic_clears": true,
+      "panic_detail": "deepest 2-5d drawdown -16.8% (within -10 to -20% range) -- qualifies; NTM revision +1.1% confirms (no consensus cut).",
+      "s11_score_low": 81, "s11_score_high": 81, "s11_threshold": 75,
+      "result": "CANDIDATE -- cleared S7 through S15. Jan-2028 $45 call, delta 0.74, robust Kelly 0.6% of NAV."
+    },
+    "NMBS": {
+      "mechanism": "M2", "fail_category": "s11_threshold",
+      "binary_event_gate": true, "panic_clears": true,
+      "s11_score_low": 70, "s11_score_high": 73, "s11_threshold": 75,
+      "result": "NO TRADE -- fails S11 threshold (75) at the best-case bound (73)"
+    },
+    "DFRG": {
+      "mechanism": "M3", "fail_category": "s10_no_pattern",
+      "binary_event_gate": true, "panic_clears": false, "breakout_clears": false,
+      "result": "NO TRADE -- no S10 pattern cleared"
+    }
+  },
+  "nearest_misses": ["NMBS (73 max possible S11 score vs 75 threshold, -2)"],
+  "notable_finding": "FICTIONAL: VLTC cleared every gate through S15 -- the rare, honest 'candidate' day this system is built to wait years for, not manufacture on demand.",
+  "result": "CANDIDATE"
+}

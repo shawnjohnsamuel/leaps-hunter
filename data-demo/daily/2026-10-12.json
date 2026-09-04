@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "framework_version": "7.0",
+  "date": "2026-10-12",
+  "run_type": "daily_screen",
+  "run_time_note": "FICTIONAL DEMO DATA -- fabricated to illustrate v7's HOLIDAY shape (Columbus Day, market closed). Tickers and figures are invented; see data-demo/README.md.",
+  "macro": null,
+  "account_ref": "000000000",
+  "nav_at_run": 50000.00,
+  "per_name": null,
+  "result": "HOLIDAY"
+}

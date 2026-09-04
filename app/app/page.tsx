@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getAllDays, getDisciplineStats, getLatest } from "@/lib/data";
-import { Disclaimer, RegimeBadge, Stat } from "@/components/ui";
+import { getAllDays, getDisciplineStats, getLatest, isV2 } from "@/lib/data";
+import { Disclaimer, MacroBadge, RegimeBadge, ResultBadge, Stat } from "@/components/ui";
 import { SignupForm } from "@/components/signup";
 
 export default function Landing() {
@@ -23,12 +23,28 @@ export default function Landing() {
           <SignupForm />
         </div>
         <p className="mt-3 text-xs text-zinc-500">
-          One email per market day: the regime verdict, what got screened out and why, and
+          One email per market day: the macro read, what got screened out and why, and
           the rare candidate that survives every gate.
         </p>
       </section>
 
-      {latest?.regime && (
+      {latest && isV2(latest) && (
+        <section className="mb-12 rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <span className="font-mono text-sm text-zinc-500">{latest.date}</span>
+            {latest.macro && <MacroBadge macro={latest.macro} />}
+            <ResultBadge result={latest.result} />
+          </div>
+          {latest.notable_finding && (
+            <p className="text-sm leading-relaxed text-zinc-400">{latest.notable_finding}</p>
+          )}
+          <Link href="/dashboard" className="mt-3 inline-block text-sm font-semibold text-emerald-400 hover:underline">
+            See the full record →
+          </Link>
+        </section>
+      )}
+
+      {latest && !isV2(latest) && latest.regime && (
         <section className="mb-12 rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
           <div className="mb-2 flex items-center gap-3">
             <span className="font-mono text-sm text-zinc-500">{latest.date}</span>
@@ -54,10 +70,11 @@ export default function Landing() {
       <section className="mb-12 space-y-3 text-sm leading-relaxed text-zinc-400">
         <h2 className="text-xl font-bold text-zinc-100">Why the restraint is the product</h2>
         <p>
-          Every session runs a hard gauntlet — binary-event windows, momentum-chasing
-          checks, valuation floors, macro-mismatch vetoes, live options-liquidity floors,
-          duration rules — and most names die at a gate before anything gets scored. A
-          candidate only reaches your inbox by surviving all of it and scoring 75+.
+          Every session runs a hard gauntlet — a macro throttle, event and quality gates,
+          four entry-pattern checks, and an eight-dimension scoring bar — and most names
+          die before anything gets priced. A candidate only reaches your inbox by
+          surviving all of it, scoring above the bar, and pricing out to a positive
+          expected value after real friction.
         </p>
         <p>
           The record so far: {stats.tradingDays} sessions, {stats.candidatesSurfaced} forced

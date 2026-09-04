@@ -2,8 +2,10 @@ name: leak-check
 # Tripwire for the public/private boundary (ADR 0002, plan Part 7.1).
 # Fails the build if any public artifact or app code carries private-side field
 # names or holdings-flavored language. Deliberately checks FIELD NAMES and
-# PHRASES, not tickers — the held-ticker check runs privately inside
-# scripts/sanitize.py at generation time, so the ticker list never lives here.
+# PHRASES, not tickers — the held-ticker check ran privately inside v6.1's
+# sanitizer at generation time (v7 has no equivalent concept; see ADR 0014 and
+# scripts/sanitize.py's own module docstring for why v7's daily-screen output
+# never contains held-position data to begin with).
 on:
   push:
   pull_request:
@@ -16,24 +18,41 @@ jobs:
       - name: Scan public artifacts for private-side terms
         run: |
           set -e
-          PATTERNS='correlation_set|portfolio_correlation|account_number|average_buy_price|"quantity"|already held|shares_available'
-          if grep -rInE "$PATTERNS" public-data/ app/ 2>/dev/null; then
+          PATTERNS='correlation_set|portfolio_correlation|account_number|account_ref|nav_at_run|average_buy_price|"quantity"|already held|shares_available'
+          if grep -rInE "$PATTERNS" public-data/ app/lib app/app app/components 2>/dev/null; then
             echo "::error::Private-side term found in public surface — see matches above"
             exit 1
           fi
           echo "leak-check: clean"
-      - name: Validate public artifacts against allowlist keys
+      - name: Validate public artifacts against allowlist keys (schema-version-aware)
         run: |
           python3 - << 'EOF'
           import json, glob, sys
-          ALLOWED = {"schema_version","kind","disclaimer","date","report_type",
-                     "framework_version","regime","rotation_watch","thesis",
-                     "screened","candidates","watch_only","nearest_miss","degraded"}
+
+          ALLOWED_V1 = {"schema_version","kind","disclaimer","date","report_type",
+                        "framework_version","regime","rotation_watch","thesis",
+                        "screened","candidates","watch_only","nearest_miss","degraded"}
+          # v7 (schema_version 2): no regime/thesis/tiers -- mechanism taxonomy +
+          # macro hard-gate/R-throttle replace them. See docs/storage-schema-v7.md
+          # and ADR 0014.
+          ALLOWED_V2 = {"schema_version","kind","disclaimer","date","framework_version",
+                        "result","macro","candidates_examined","candidates_clearing_gates",
+                        "candidates","nearest_misses","gates_summary","notable_finding"}
+
           bad = False
           for f in glob.glob("public-data/**/*.json", recursive=True):
-              extra = set(json.load(open(f))) - ALLOWED
+              doc = json.load(open(f))
+              version = doc.get("schema_version")
+              allowed = ALLOWED_V1 if version == 1 else ALLOWED_V2 if version == 2 else None
+              if allowed is None:
+                  print(f"::error::{f} has unrecognized schema_version: {version!r}")
+                  bad = True
+                  continue
+              extra = set(doc) - allowed
               if extra:
-                  print(f"::error::{f} carries non-allowlisted keys: {extra}")
+                  print(f"::error::{f} (schema_version {version}) carries non-allowlisted keys: {extra}")
                   bad = True
           sys.exit(1 if bad else 0)
           EOF
+      - name: Run the sanitizer's own leak tests
+        run: python3 -m unittest discover -s scripts/tests -t .

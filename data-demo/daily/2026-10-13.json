@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "framework_version": "7.0",
+  "date": "2026-10-13",
+  "run_type": "daily_screen",
+  "run_time_note": "FICTIONAL DEMO DATA -- fabricated to illustrate v7's DATA_INSUFFICIENT shape: S0's live-chain precondition failed (Robinhood option-chain endpoint unreachable), so the screen stopped before any candidate work rather than guess. Tickers and figures are invented; see data-demo/README.md.",
+  "macro": {
+    "hard_gates_active": {"credit_stress": false, "inflation_duration_shock": false, "equity_deleveraging": false},
+    "R": 1, "restricted": false, "score_threshold": 75, "kelly_multiplier": 0.25, "as_of": "2026-10-12"
+  },
+  "account_ref": "000000000",
+  "nav_at_run": 50000.00,
+  "per_name": null,
+  "result": "NO TRADE -- DATA INSUFFICIENT"
+}

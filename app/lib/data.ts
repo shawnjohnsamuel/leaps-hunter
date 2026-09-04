@@ -5,8 +5,14 @@ import path from "node:path";
 // Vercel checks out the whole repo, so this resolves at build time there too.
 const DATA_DIR = path.join(process.cwd(), "..", "public-data");
 
-export type PublicDaily = {
-  schema_version: number;
+// ---------------------------------------------------------------------------
+// Legacy v6.1 shape (schema_version 1). Five real days were published under this
+// schema before the v7 migration; they are static, already-sanitized files that
+// will never be re-generated. Kept verbatim so they keep rendering ("legacy mode",
+// migration plan Phase 7) rather than being reshaped to fit v7's schema.
+// ---------------------------------------------------------------------------
+export type PublicDailyV1 = {
+  schema_version: 1;
   kind: "public-daily";
   disclaimer: string;
   date: string;
@@ -27,6 +33,45 @@ export type PublicDaily = {
   degraded: boolean;
 };
 
+// ---------------------------------------------------------------------------
+// v7 shape (schema_version 2). No regime verdict, no thesis, no tiers — v7 has
+// no equivalent concepts (mechanism taxonomy + macro hard-gates/R-throttle
+// replace them entirely). See docs/storage-schema-v7.md and ADR 0002/0014.
+// ---------------------------------------------------------------------------
+export type Mechanism = "M1" | "M2" | "M3" | "M4";
+
+export type PublicDailyV2 = {
+  schema_version: 2;
+  kind: "public-daily";
+  disclaimer: string;
+  date: string;
+  framework_version: string;
+  result: "NO_TRADE" | "CANDIDATE" | "HOLIDAY" | "DATA_INSUFFICIENT";
+  macro: {
+    R: number;
+    restricted: boolean;
+    score_threshold: number;
+    hard_gate_active: boolean;
+    hard_gate_names: string[];
+  } | null;
+  candidates_examined: number | null;
+  candidates_clearing_gates: number | null;
+  candidates: { ticker: string; mechanism: Mechanism | null; score: string | null; one_line: string | null }[];
+  nearest_misses: { ticker: string; mechanism: Mechanism | null; category: string; score: string | null; note: string | null }[];
+  gates_summary: Record<string, number>;
+  notable_finding: string | null;
+};
+
+export type PublicDaily = PublicDailyV1 | PublicDailyV2;
+
+export function isV2(d: PublicDaily): d is PublicDailyV2 {
+  return d.schema_version === 2;
+}
+
+function readDay(file: string): PublicDaily {
+  return JSON.parse(fs.readFileSync(file, "utf8")) as PublicDaily;
+}
+
 export function getAllDays(): PublicDaily[] {
   const dir = path.join(DATA_DIR, "daily");
   if (!fs.existsSync(dir)) return [];
@@ -35,13 +80,13 @@ export function getAllDays(): PublicDaily[] {
     .filter((f) => f.endsWith(".json"))
     .sort()
     .reverse()
-    .map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")) as PublicDaily);
+    .map((f) => readDay(path.join(dir, f)));
 }
 
 export function getLatest(): PublicDaily | null {
   const p = path.join(DATA_DIR, "latest.json");
   if (!fs.existsSync(p)) return null;
-  return JSON.parse(fs.readFileSync(p, "utf8")) as PublicDaily;
+  return readDay(p);
 }
 
 export type DisciplineStats = {
@@ -53,13 +98,18 @@ export type DisciplineStats = {
   topGates: [string, number][];
 };
 
+const NON_GATE_BUCKETS = new Set(["scored below threshold", "cleared"]);
+
 export function getDisciplineStats(days: PublicDaily[]): DisciplineStats {
-  const tradingDays = days.filter((d) => d.report_type !== "HOLIDAY");
+  const tradingDays = days.filter((d) =>
+    isV2(d) ? d.result !== "HOLIDAY" : d.report_type !== "HOLIDAY"
+  );
   const gates: Record<string, number> = {};
   let gatesFired = 0;
   for (const d of tradingDays) {
-    for (const [k, v] of Object.entries(d.screened?.gates ?? {})) {
-      if (k === "scored below threshold") continue;
+    const bucket = isV2(d) ? d.gates_summary : d.screened?.gates ?? {};
+    for (const [k, v] of Object.entries(bucket)) {
+      if (NON_GATE_BUCKETS.has(k)) continue;
       gates[k] = (gates[k] ?? 0) + v;
       gatesFired += v;
     }
@@ -68,7 +118,7 @@ export function getDisciplineStats(days: PublicDaily[]): DisciplineStats {
     sessions: days.length,
     tradingDays: tradingDays.length,
     candidatesSurfaced: tradingDays.reduce((n, d) => n + d.candidates.length, 0),
-    zeroTradeDays: tradingDays.filter((d) => d.report_type === "ZERO_TRADE").length,
+    zeroTradeDays: tradingDays.filter((d) => (isV2(d) ? d.result === "NO_TRADE" : d.report_type === "ZERO_TRADE")).length,
     gatesFired,
     topGates: Object.entries(gates).sort((a, b) => b[1] - a[1]).slice(0, 4),
   };

@@ -115,7 +115,21 @@ With an empty book this trivially passes; say so rather than skipping the check 
 
 A name that clears every step above is a `CANDIDATE`. Everything else is `NO TRADE` for that
 name today, with the specific gate or threshold that stopped it recorded (§18 requires naming
-it).
+it). Record each name's `mechanism` (copied straight from `state/watchlist.json`, not
+re-derived) alongside its result — Phase 7's public sanitizer tags every published name by
+mechanism, and re-deriving it from scratch would risk drifting from Stage A's own assignment.
+
+Alongside the free-text reason, record a **structured** `fail_category` from this fixed
+vocabulary — Phase 7's public sanitizer aggregates counts from this field, not by parsing free
+text, so use it exactly rather than inventing a new label:
+
+`s7_binary_event` · `s7_valuation_insanity` · `s7_single_variable` · `s7_catalyst_duration` ·
+`s7_governance_risk` · `s10_no_pattern` · `s10_unresolved_confirmation` · `s11_subgate` ·
+`s11_threshold` · `s12_liquidity` · `s12_ev` · `s13_delta_policy` · `s14_infeasible` · `cleared`
+
+Use `s11_threshold` (not `s11_subgate`) when the total score is the binding constraint even if
+a sub-gate also happens to be unmet — match what actually stopped the name from proceeding, per
+§18's own "the specific gate... that stopped it" requirement.
 
 ## Output (§18, `docs/storage-schema-v7.md`)
 

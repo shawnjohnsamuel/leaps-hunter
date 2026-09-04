@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "framework_version": "7.0",
+  "date": "2026-10-06",
+  "run_type": "daily_screen",
+  "run_time_note": "FICTIONAL DEMO DATA -- fabricated to illustrate v7's NO_TRADE shape, the modal day-to-day outcome. Tickers (VLTC, NMBS, DFRG) are invented companies; no file here reflects any real screen, position, or recommendation (see data-demo/README.md, ADR 0002).",
+  "macro": {
+    "hard_gates_active": {"credit_stress": false, "inflation_duration_shock": false, "equity_deleveraging": false},
+    "R": 1, "restricted": false, "score_threshold": 75, "kelly_multiplier": 0.25, "as_of": "2026-10-05"
+  },
+  "account_ref": "000000000",
+  "nav_at_run": 50000.00,
+  "watchlist_reviewed": "2026-10-04",
+  "candidates_examined": 4,
+  "candidates_clearing_s7_s10": 1,
+  "candidates_clearing_s11": 0,
+  "per_name": {
+    "VLTC": {
+      "mechanism": "M1", "fail_category": "s10_no_pattern",
+      "binary_event_gate": true, "panic_clears": false, "breakout_clears": false,
+      "result": "NO TRADE -- no S10 pattern cleared"
+    },
+    "NMBS": {
+      "mechanism": "M2", "fail_category": "s11_threshold",
+      "binary_event_gate": true, "panic_clears": true,
+      "panic_detail": "deepest 2-5d drawdown -14.2% (within -10 to -20% range) -- qualifies; NTM revision +0.4% confirms.",
+      "s11_score_low": 68, "s11_score_high": 71, "s11_threshold": 75,
+      "result": "NO TRADE -- fails S11 threshold (75) even at the best-case bound (71)"
+    },
+    "DFRG": {
+      "mechanism": "M3", "fail_category": "s10_no_pattern",
+      "binary_event_gate": true, "panic_clears": false, "breakout_clears": false,
+      "result": "NO TRADE -- no S10 pattern cleared"
+    },
+    "QSTL": {
+      "mechanism": "M1", "fail_category": "s7_binary_event",
+      "binary_event_gate": false,
+      "result": "NO TRADE -- S7 binary-event gate: earnings in 6 days"
+    }
+  },
+  "nearest_misses": ["NMBS (71 max possible S11 score vs 75 threshold, -4)"],
+  "notable_finding": "FICTIONAL: NMBS's panic pattern cleared but the setup fell short of the scoring bar by a modest 4 points -- a realistic 'close but no' day, the most common outcome the system produces.",
+  "result": "NO TRADE"
+}

@@ -103,3 +103,28 @@ not a wasted screen — it is exactly as valuable to the ledger as a feasible on
   reuse the daily/weekly work at near-zero token cost — see the migration plan §4.
 - **A missing `weekly/` or `daily/` file for a session that should have run one** still means
   the automation failed, same as v6.1's rule; the file types just changed shape.
+
+## Public schema (`public-data/*.json`, `schema_version: 2`)
+
+Phase 7 (2026-09-04+). Produced by `scripts/sanitize.py` from a private `daily/YYYY-MM-DD.json`
+(never from `weekly/` or `adhoc/` records) — strict allowlist, per ADR 0002: fields are copied
+in by name, never filtered out. `account_ref` and `nav_at_run` are never named in the allowlist
+at all, which is the whole point — a leak would require adding a line that reads a forbidden
+key, not merely failing to remove one. See the script's own module docstring and
+[ADR 0014](decisions/0014-macro-fetch-desktop-only.md) for why v7's daily-screen output has no
+held-position data to redact in the first place (unlike v6.1, which needed an explicit
+held-ticker tripwire).
+
+| Field | Notes |
+|---|---|
+| `result` | `NO_TRADE` \| `CANDIDATE` \| `HOLIDAY` \| `DATA_INSUFFICIENT` — trusts the private record's own `result` field directly; never re-derived by pattern-matching `run_time_note`'s free text (a 2026-09-04 bug found that approach false-positives when one day's note mentions a *different* day's outcome in passing) |
+| `macro` | `{R, restricted, score_threshold, hard_gate_active, hard_gate_names}` or `null` — no macro `reasoning` free text; every field is a safe aggregate/boolean |
+| `candidates` | Only names with `fail_category: "cleared"` — `{ticker, mechanism, score, one_line}`. `score` is a compact `"low-high/threshold needed"` string, never the full §11 8-dimension breakdown |
+| `nearest_misses` | Names whose `fail_category` is in a "notable" set (`s10_unresolved_confirmation`, `s11_threshold`, `s11_subgate`, `s12_liquidity`, `s12_ev`) — richer detail than an ordinary rejection, matching the product's own "show your work" premise (framework/v7.md is already fully public; near-miss detail isn't a methodology leak, only holdings/NAV would be) |
+| `gates_summary` | Aggregate counts by `fail_category`, mirroring v6.1's `screened.gates` — built from the private record's structured `fail_category` field (`.claude/skills/daily-screen/SKILL.md`'s fixed vocabulary), never parsed from free text |
+
+**Legacy v6.1 days** (`schema_version: 1`, five real archived days) are untouched, static files
+— `app/lib/data.ts` renders both schemas side by side (`isV2()` branches per day), which is
+what the migration plan calls "legacy-mode rendering." `scripts/sanitize.py` v2 refuses any
+input whose `framework_version` doesn't start with `"7."` — it was never meant to re-process
+the v6.1 archive, only new v7 records.
