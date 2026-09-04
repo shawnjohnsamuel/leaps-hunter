@@ -43,6 +43,28 @@ FORBIDDEN_TEXT = re.compile(
 # aggregated into gates_summary. Matches daily-screen SKILL.md's fixed vocabulary.
 NOTABLE_NEAR_MISS_CATEGORIES = {"s10_unresolved_confirmation", "s11_threshold", "s11_subgate", "s12_liquidity", "s12_ev"}
 
+# Public-facing labels for daily-screen's fixed fail_category vocabulary -- matches
+# v6.1's GATE_LABELS convention (human-readable, also hides internal section
+# numbering from a casual reader). gates_summary keys are relabeled here, server
+# side, rather than left as raw codes for the frontend to reformat -- keeps the
+# public JSON itself self-describing for any consumer, not just this one app.
+GATE_LABELS = {
+    "s7_binary_event": "binary-event window",
+    "s7_valuation_insanity": "valuation",
+    "s7_single_variable": "single-variable dependency",
+    "s7_catalyst_duration": "catalyst duration",
+    "s7_governance_risk": "governance risk",
+    "s10_no_pattern": "no entry pattern",
+    "s10_unresolved_confirmation": "pattern confirmation unresolved",
+    "s11_subgate": "scoring sub-gate",
+    "s11_threshold": "scored below threshold",
+    "s12_liquidity": "liquidity floors",
+    "s12_ev": "expected value",
+    "s13_delta_policy": "delta policy",
+    "s14_infeasible": "infeasible at current NAV",
+    "unknown": "other",
+}
+
 DISCLAIMER = (
     "Output of a rules-based AI research system. NOT financial advice; no client "
     "relationship exists; this may be wrong. Do your own research. Options can lose "
@@ -121,12 +143,13 @@ def sanitize(priv: dict) -> dict:
                 "one_line": clean_text(entry.get("result"), f"per_name.{ticker}.result"),
             })
             continue
-        gates_summary[cat] = gates_summary.get(cat, 0) + 1
+        label = GATE_LABELS.get(cat, cat)
+        gates_summary[label] = gates_summary.get(label, 0) + 1
         if cat in NOTABLE_NEAR_MISS_CATEGORIES:
             near_misses.append({
                 "ticker": ticker,
                 "mechanism": mechanism,
-                "category": cat,
+                "category": label,
                 "score": _score_summary(entry),
                 "note": clean_text(entry.get("result"), f"per_name.{ticker}.result"),
             })

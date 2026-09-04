@@ -19,22 +19,22 @@
     {
       "ticker": "PANW",
       "mechanism": "M2",
-      "category": "s10_unresolved_confirmation",
+      "category": "pattern confirmation unresolved",
       "score": null,
       "note": "NO TRADE -- panic pattern qualifies but cannot confirm (NTM data gap); nearest miss of pattern type"
     },
     {
       "ticker": "MDB",
       "mechanism": "M2",
-      "category": "s11_threshold",
+      "category": "scored below threshold",
       "score": "scored 63-78/80 needed",
       "note": "NO TRADE -- fails S11 threshold (80) even at the best-case bound (78) for the one unresolved dimension. S12-15 not attempted -- nothing left to price. Same conclusion as 2026-09-03: fundamentals and kill-switch status are unchanged day-over-day (kill_switch_check_2026-09-04: NOT TRIGGERED, stock partially recovering)."
     }
   ],
   "gates_summary": {
-    "s10_no_pattern": 11,
-    "s10_unresolved_confirmation": 1,
-    "s11_threshold": 1
+    "no entry pattern": 11,
+    "pattern confirmation unresolved": 1,
+    "scored below threshold": 1
   },
   "notable_finding": "Second consecutive day the RESTRICTED regime's raised threshold (80 vs 75 normal) is the binding constraint, not a lack of real dislocation: MDB's S11 total would need only 2 more points (any 2 of its 7 already-scored dimensions, or a mid-single-digit option_implementation read) to clear at the RESTRICTED bar, and would clear easily at the NORMAL bar (75). state/macro-latest.json's R=4/RESTRICTED reading is now 2 days stale (as_of 2026-09-02) -- a macro-refresh run (desktop-only) is needed before this throttle reading can be treated as current; until then it is being applied conservatively (fail-closed, not re-derived) rather than assumed to have eased."
 }

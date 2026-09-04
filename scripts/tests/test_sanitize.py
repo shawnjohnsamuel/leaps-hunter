@@ -107,10 +107,16 @@ class SanitizeLeakTests(unittest.TestCase):
         self.assertEqual(len(pub["candidates"]), 1)
         self.assertEqual(pub["candidates"][0]["ticker"], "FAKECO3")
 
-    def test_gates_summary_aggregates_by_fail_category(self):
+    def test_gates_summary_aggregates_by_fail_category_with_human_readable_labels(self):
+        # Public JSON carries GATE_LABELS' relabeled text, not the raw fail_category
+        # code -- keeps the artifact self-describing for any consumer, matching
+        # v6.1's own GATE_LABELS convention (2026-09-04 fix: the raw codes were
+        # showing up unlabeled on the live dashboard next to v6.1's formatted ones).
         pub = sanitize(_base_private())
-        self.assertEqual(pub["gates_summary"].get("s10_no_pattern"), 1)
-        self.assertEqual(pub["gates_summary"].get("s11_threshold"), 1)
+        self.assertEqual(pub["gates_summary"].get("no entry pattern"), 1)
+        self.assertEqual(pub["gates_summary"].get("scored below threshold"), 1)
+        self.assertNotIn("s10_no_pattern", pub["gates_summary"])
+        self.assertNotIn("s11_threshold", pub["gates_summary"])
         # The cleared name must not appear in gates_summary at all.
         self.assertNotIn("cleared", pub["gates_summary"])
 

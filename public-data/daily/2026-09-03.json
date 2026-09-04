@@ -19,21 +19,21 @@
     {
       "ticker": "CRWD",
       "mechanism": "M2",
-      "category": "s11_threshold",
+      "category": "scored below threshold",
       "score": "scored 63-78/80 needed",
       "note": "NO TRADE -- fails S11 threshold (80) even at the best-case bound (78) for the one unresolved dimension. S12-15 not attempted -- nothing left to price."
     },
     {
       "ticker": "MDB",
       "mechanism": "M2",
-      "category": "s11_threshold",
+      "category": "scored below threshold",
       "score": "scored 63-78/80 needed",
       "note": "NO TRADE -- fails S11 threshold (80) even at the best-case bound (78) for the one unresolved dimension. S12-15 not attempted -- nothing left to price."
     }
   ],
   "gates_summary": {
-    "s10_no_pattern": 11,
-    "s11_threshold": 2
+    "no entry pattern": 11,
+    "scored below threshold": 2
   },
   "notable_finding": "The RESTRICTED regime's raised threshold (80 vs 75 normal) is doing real, visible work today: both names that cleared the mechanical S7/S10 gates fell short of S11 by only 2 points even under the most generous possible assumption. In a NORMAL regime (threshold 75) both would have cleared to S12-15. This is v7's macro throttle functioning exactly as designed -- not a bug or a data gap, a deliberate higher bar during a high-valuation/tight-credit/contracting-liquidity regime."
 }
