@@ -15,8 +15,7 @@ here, never in `daily-screen`** (§4.2) — this is the primary defense against 
 
 ## Setup
 
-1. Resolve the private data path from `.claude/leaps-data-path.local` (create it, asking the
-   user once, if missing). All state files below live under `<data-path>/state/`.
+1. Locate the private data repo's checkout directly — `find / -maxdepth 4 -iname "leaps-hunter-data" -type d` in a cloud routine (it's always a sibling checkout, one of the routine's own `sources`), or ask the user once for the local path in a desktop session. **Never write a `.local` pointer file to resolve this** — a 2026-09-04 cloud run found the harness's sensitive-file classifier flags any `.claude/*.local` write for interactive approval, and an unattended routine has no one to approve it; the run hangs before it can ever send its own failure notification. All state files below live under `<data-path>/state/`.
 2. Load `state/config.yaml` via `engine.config.load_config` — this is the only place any
    threshold exists (ADR 0010). Never hardcode a number that's in this file.
 3. Load `state/watchlist.json` and `state/macro-latest.json` for prior state.
