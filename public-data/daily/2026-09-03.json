@@ -1,0 +1,39 @@
+{
+  "schema_version": 2,
+  "kind": "public-daily",
+  "disclaimer": "Output of a rules-based AI research system. NOT financial advice; no client relationship exists; this may be wrong. Do your own research. Options can lose 100% of premium. Hypothetical results are not real returns.",
+  "date": "2026-09-03",
+  "framework_version": "7.0",
+  "result": "NO_TRADE",
+  "macro": {
+    "R": 4,
+    "restricted": true,
+    "score_threshold": 80,
+    "hard_gate_active": false,
+    "hard_gate_names": []
+  },
+  "candidates_examined": 13,
+  "candidates_clearing_gates": 2,
+  "candidates": [],
+  "nearest_misses": [
+    {
+      "ticker": "CRWD",
+      "mechanism": "M2",
+      "category": "s11_threshold",
+      "score": "scored 63-78/80 needed",
+      "note": "NO TRADE -- fails S11 threshold (80) even at the best-case bound (78) for the one unresolved dimension. S12-15 not attempted -- nothing left to price."
+    },
+    {
+      "ticker": "MDB",
+      "mechanism": "M2",
+      "category": "s11_threshold",
+      "score": "scored 63-78/80 needed",
+      "note": "NO TRADE -- fails S11 threshold (80) even at the best-case bound (78) for the one unresolved dimension. S12-15 not attempted -- nothing left to price."
+    }
+  ],
+  "gates_summary": {
+    "s10_no_pattern": 11,
+    "s11_threshold": 2
+  },
+  "notable_finding": "The RESTRICTED regime's raised threshold (80 vs 75 normal) is doing real, visible work today: both names that cleared the mechanical S7/S10 gates fell short of S11 by only 2 points even under the most generous possible assumption. In a NORMAL regime (threshold 75) both would have cleared to S12-15. This is v7's macro throttle functioning exactly as designed -- not a bug or a data gap, a deliberate higher bar during a high-valuation/tight-credit/contracting-liquidity regime."
+}
