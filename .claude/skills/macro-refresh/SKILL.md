@@ -35,12 +35,23 @@ Identical to `weekly-review`'s former §1 — pull fresh series and feed them in
 | DFII30 | `fetch_fred_series` | §6.2 real-30y percentile |
 | WALCL, WTREGEN, RRPONTSYD | `fetch_fred_series` each | `engine.macro.net_liquidity_series` |
 | Shiller CAPE | `engine.sources.fetch_cape_series` | §6.2 CAPE percentile |
-| VIX, SPX | `fetch_fred_series("VIXCLS")`, `("SP500")` | §6.1 equity-deleveraging gate |
 | Breadth | `state/macro-latest.json`'s `breadth` block | Desktop-cadence job, separate from this one (ADR 0012) |
 
-Compute each §6.1 gate's trigger/release booleans, call `engine.macro.step_hard_gate` against
-the prior state in `state/macro-latest.json`, and compute `engine.macro.compute_restricted_regime`
-for `R`. Write the full result back to `state/macro-latest.json` with `run_type: "macro_refresh"`.
+Compute the trigger/release booleans for **`credit_stress` and `inflation_duration_shock` only**,
+call `engine.macro.step_hard_gate` for those two against the prior state in
+`state/macro-latest.json`, and compute `engine.macro.compute_restricted_regime` for `R`. Write
+the result back to `state/macro-latest.json` with `run_type: "macro_refresh"`.
+
+**Do not compute or step `hard_gates.equity_deleveraging` — `daily-screen` owns that key.**
+That gate's inputs (VIX, SPX vs its 200dma) move daily and, unlike everything else in this table,
+are reachable from a cloud routine via Robinhood's index tools, so `daily-screen` now computes and
+steps it every session. Two writers stepping the same gate would double-advance its release
+streak. This also fixes a cadence error: `release_consecutive_closes` counts *trading-day closes*,
+and a gate stepped once per weekly run of this skill would have taken five weeks to release
+instead of five sessions.
+
+Leave the `hard_gates.equity_deleveraging` block exactly as you found it, and preserve every other
+key you did not compute rather than rewriting the file wholesale.
 
 ### 2. NTM estimate-revision refresh (§10 patterns 2 & 3)
 

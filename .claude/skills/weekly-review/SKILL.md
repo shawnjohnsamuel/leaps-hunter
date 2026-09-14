@@ -13,11 +13,20 @@ a threshold in prose. If anything here disagrees with `v7.md` or `state/config.y
 **Cadence:** weekly, before the first `daily-screen` session of the week. **Discovery happens
 here, never in `daily-screen`** (§4.2) — this is the primary defense against overtrading.
 
-**This skill is cloud-safe and reads macro/NTM state; it never fetches it.** The macro hard-gate
-refresh and the Alpha Vantage NTM refresh are a separate skill, **`macro-refresh`**, run from a
-desktop session — FRED, Alpha Vantage, and multpl.com are unreachable from a cloud routine
-(confirmed 2026-09-04, `docs/decisions/0014-macro-fetch-desktop-only.md`). Run `macro-refresh`
-at least weekly, ideally right before this skill, so its kill-switch/§8 work has fresh context.
+**This skill is cloud-safe and reads macro/NTM state; it never fetches it.** The macro refresh
+and the Alpha Vantage NTM refresh are a separate skill, **`macro-refresh`**, run from a desktop
+session — FRED, Alpha Vantage, and multpl.com are unreachable from a cloud routine (confirmed
+2026-09-04, `docs/decisions/0014-macro-fetch-desktop-only.md`).
+
+**Ordering: run `macro-refresh` *after* this skill, and before the week's first `daily-screen`.**
+This skill's own use of macro/NTM state is informational — it reads the values and notes them,
+but every decision it makes (kill switches, §8, pattern assignment, retirement/admission) is
+company-specific and macro-independent, so running on a few-day-old read costs it nothing. The
+routine that genuinely needs fresh state is **`daily-screen`**, which scores against
+`restricted_regime.score_threshold` and each name's `ntm` field. And this skill can *admit* new
+names, which have no `ntm` at all until the next `macro-refresh` — so refreshing afterward is
+what closes that gap in the same cycle rather than a week later. Sunday evening (after this
+skill's Sunday run, before Monday's screen) is the intended slot.
 
 ## Setup
 
@@ -145,7 +154,8 @@ Write `weekly/YYYY-MM-DD.json` (see `docs/storage-schema-v7.md`), update `state/
 in place (kill-switch results, §8 verdicts, pattern assignments, retirements/admissions —
 never the `ntm` field, which only `macro-refresh` writes), and commit + push in the data repo:
 `git add -A && git commit -m "weekly review YYYY-MM-DD: <one-line summary>" && git push`.
-Do not touch `state/macro-latest.json` — it's `macro-refresh`'s file now.
+Do not touch `state/macro-latest.json` at all — `macro-refresh` owns every key in it except
+`hard_gates.equity_deleveraging`, which `daily-screen` steps each session.
 
 ## Cost discipline
 

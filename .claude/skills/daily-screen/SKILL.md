@@ -37,14 +37,61 @@ Output `NO TRADE — DATA INSUFFICIENT`, name the missing input, and stop:
 
 ## 1. Macro gate check (§6.1) — portfolio-wide, run once
 
-Read `state/macro-latest.json` (written by the last `weekly-review` or `daily-screen` run).
-If any `hard_gates.*.active` is `true`: **no new long LEAPS today**, regardless of what
-anything below finds. Say so plainly and stop candidate evaluation — existing positions may
-still be reviewed under §16's management rules, which is a separate activity from this screen.
+`state/macro-latest.json` is written by **`macro-refresh`**, a desktop-only skill — FRED, Shiller
+CAPE and Alpha Vantage are egress-blocked from cloud routines (ADR 0014). Neither this skill nor
+`weekly-review` can refresh the slow-moving series in it. Read the `restricted_regime` block;
+never re-derive it.
 
-If breadth is needed today (VIX and S&P conditions both already fire) and
-`state/macro-latest.json`'s `breadth` block is missing or older than `stale_after_days`, treat
-the equity-deleveraging gate as **ACTIVE** (ADR 0012 fail-closed) rather than re-deriving it.
+**1a. Staleness check.** Compare `as_of` to today:
+
+- **≤7 days** — current, use as-is.
+- **8–14 days** — use it, but record a `macro.staleness_flag` string in today's
+  `daily/YYYY-MM-DD.json` *and* lead this run's notification with
+  `⚠️ MACRO STATE STALE (as_of: <date>) — run macro-refresh`. The R throttle sets
+  `score_threshold`, which is the binding constraint on most near-misses, so a stale read
+  silently moves every verdict. Flag it where a human will actually see it, not only in the JSON.
+- **>14 days** — stop with `NO TRADE — DATA INSUFFICIENT`, naming `state/macro-latest.json` as
+  the missing input. Past two weeks the regime read is no longer evidence about today; fail
+  closed rather than scoring against a number nobody has verified (§0).
+
+This mirrors §0.2's `last_stage_a_review` precondition — the two freshness clocks are symmetric
+by design.
+
+**1b. Slow-moving gates — read, don't recompute.** `hard_gates.credit_stress` and
+`hard_gates.inflation_duration_shock` come from `macro-latest.json` as the last `macro-refresh`
+left them. Their inputs (HY OAS, real/nominal yields, 5y5y breakevens) drift slowly enough that
+a weekly read is appropriate.
+
+**1c. Equity-deleveraging gate — compute it fresh, every run.** Unlike the other two, this
+gate's inputs move *daily*, and they are reachable from a cloud routine: Robinhood's
+`get_indexes` → `get_index_quotes` (VIX latest and prior close) and `get_index_historicals`
+(SPX, enough daily history for a trailing 200-session mean). Assemble:
+
+- `vix_now`, `vix_prev`
+- `spx_pct_below_200dma` — SPX latest close vs its trailing 200-session mean
+- `breadth_pct_above_200dma` — read `macro-latest.json`'s `breadth` block; if it is missing or
+  older than `stale_after_days`, pass `None` and let ADR 0012's fail-closed rule apply rather
+  than re-deriving it
+
+then call `engine.macro.equity_deleveraging_trigger` and `equity_deleveraging_release_met`, and
+step the gate with `engine.macro.step_hard_gate` — passing the prior
+`hard_gates.equity_deleveraging` state from `macro-latest.json` and
+`macro_hard_gates.equity_deleveraging.release_consecutive_closes` from `state/config.yaml`.
+
+**This skill owns `hard_gates.equity_deleveraging` and writes back that key only.**
+`macro-refresh` owns every other key in the file and must not step this gate — double-stepping
+would corrupt the release streak. Split-key ownership of one file is the same pattern already
+used for `watchlist.json` (`macro-refresh` owns `ntm`, `weekly-review` owns the rest), and works
+for the same reason: the writers touch disjoint keys.
+
+Stepping it here also fixes a cadence error: `release_consecutive_closes` counts *trading-day
+closes*, so a gate stepped once per weekly `macro-refresh` run would take five weeks to release
+instead of five sessions.
+
+**1d. Act on the result.** If any `hard_gates.*.active` is `true`: **no new long LEAPS today**,
+regardless of what anything below finds. Say so plainly and stop candidate evaluation — existing
+positions may still be reviewed under §16's management rules, which is a separate activity from
+this screen.
 
 ## 2. Per-candidate screen — cheapest checks first (§4.2's own ordering)
 
@@ -59,9 +106,10 @@ calls on a name that's already rejected.
 
 **2b. §10 entry patterns** — for each pattern in the name's `permitted_entry_patterns`:
 - `panic` → `engine.patterns.panic_pattern`, needs recent daily closes
-  (`get_equity_historicals`) and an `NTMResult` (reuse Stage A's cached one from
-  `state/watchlist.json` — do not re-fetch Alpha Vantage here; that is exactly the token cost
-  the weekly/daily split exists to avoid).
+  (`get_equity_historicals`) and an `NTMResult` (reuse the cached one in each name's `ntm` field
+  in `state/watchlist.json`, written by `macro-refresh` — do not re-fetch Alpha Vantage here.
+  It is egress-blocked from cloud routines anyway, and avoiding that call is exactly the token
+  cost the weekly/daily split exists to avoid).
 - `quiet_inflection` → `engine.patterns.quiet_inflection_pattern`, needs the `accelerating_metrics_count`
   judgment call (from the name's Stage A evidence) and the cached `NTMResult`.
 - `breakout` → `engine.patterns.breakout_pattern`, needs closes and the cached `NTMResult`.
@@ -154,9 +202,12 @@ candidate (feasible or not), commit + push in the data repo.
 
 ## Cost discipline
 
-- Never re-fetch what Stage A already cached (NTM revisions, mechanism evidence, kill-switch
-  status). If it's more than 7 days stale, that's `weekly-review`'s job to refresh, not this
-  skill's.
+- Never re-fetch what's already cached upstream: mechanism evidence and kill-switch status come
+  from `weekly-review`; NTM revisions and the macro regime come from `macro-refresh`. Neither is
+  this skill's to refresh. Note that these have **different owners** — a stale `ntm` field or a
+  stale `macro-latest.json` is fixed by `macro-refresh` (desktop-only), *not* by `weekly-review`,
+  which is egress-blocked from both sources and can only read them. Flag staleness per §1a and
+  move on; waiting for `weekly-review` to fix it would wait forever.
 - Gate before you spend a chain call — §7 and §10 are cheap (quotes, historicals, earnings
   dates); §12's chain pull is the expensive step per name. A name killed at 2a or 2b costs zero
   option-chain calls.
