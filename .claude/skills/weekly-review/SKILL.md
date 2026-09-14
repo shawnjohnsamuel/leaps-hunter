@@ -154,8 +154,9 @@ Write `weekly/YYYY-MM-DD.json` (see `docs/storage-schema-v7.md`), update `state/
 in place (kill-switch results, §8 verdicts, pattern assignments, retirements/admissions —
 never the `ntm` field, which only `macro-refresh` writes), and commit + push in the data repo:
 `git add -A && git commit -m "weekly review YYYY-MM-DD: <one-line summary>" && git push`.
-Do not touch `state/macro-latest.json` at all — `macro-refresh` owns every key in it except
-`hard_gates.equity_deleveraging`, which `daily-screen` steps each session.
+Do not touch `state/macro-latest.json` or `state/nyse-constituents.json` at all — `macro-refresh`
+owns every key in the macro file except `hard_gates.equity_deleveraging` and `breadth`, which
+`daily-screen` owns, and `macro-refresh` owns the constituents list.
 
 ## Cost discipline
 

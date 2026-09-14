@@ -74,18 +74,39 @@ gate's inputs move *daily*, and they are reachable from a cloud routine: Robinho
   and the parameter's name reads like a positive magnitude. The natural hand-derivation
   `(mean − close) / mean` inverts the sign, so a real 12% drawdown arrives as +12 and the gate
   silently never fires. This exact mistake was made in a manual refresh on 2026-09-10.
-- `breadth_pct_above_200dma` — read `macro-latest.json`'s `breadth` block; if it is missing or
-  older than `stale_after_days`, pass `None` and let ADR 0012's fail-closed rule apply rather
-  than re-deriving it
+- `breadth_pct_above_200dma` — **computed only when needed, never read from cache** (ADR 0016).
+  First call `engine.macro.breadth_needed(vix_now, vix_prev, spx_pct, gate_active, cfg)`, where
+  `gate_active` is the prior `hard_gates.equity_deleveraging.active`.
+  - **False** (the normal case — VIX and SPX not both escalated, gate inactive): pass `None`
+    and skip the NYSE pull entirely. This is safe, not a shortcut: the trigger returns before
+    reading breadth, and release is never evaluated on an inactive gate.
+  - **True**: compute it fresh, this session. Read the universe from
+    `state/nyse-constituents.json` (1,750 NYSE-listed common stocks). Call
+    `get_equity_historicals` in batches of **10 symbols** (Robinhood's per-call cap),
+    `interval: day`, `start_time` at least ~300 calendar days back so every name has 200+
+    sessions. Class shares use dot format (`BRK.B`) — pass them exactly as listed. Each
+    response is ~380KB and will be saved to a file; don't read it into context. Parse every
+    file with `engine.sources.parse_robinhood_daily_closes`, merge into one
+    `{symbol: [(date, close), ...]}` dict, and call `engine.macro.compute_breadth(closes,
+    universe, cfg)`. Pass `result.pct_above_200dma` to the gate — it is `None` when coverage fell
+    below `breadth_min_coverage`, which fails closed.
+
+  Measured 2026-09-14: 175 calls, zero errors, zero throttling, ~1.5s per call, **about five
+  minutes** end to end. If a batch errors, retry it once; if calls keep failing, stop pulling,
+  let `compute_breadth` report low coverage, and say so in the notification — do not guess a
+  number. Never substitute `breadth.last_reading` from `macro-latest.json` for a fresh value:
+  a reading from a calm week would pass as healthy breadth during a crash and suppress the gate.
 
 then call `engine.macro.equity_deleveraging_trigger` and `equity_deleveraging_release_met`, and
 step the gate with `engine.macro.step_hard_gate` — passing the prior
 `hard_gates.equity_deleveraging` state from `macro-latest.json` and
 `macro_hard_gates.equity_deleveraging.release_consecutive_closes` from `state/config.yaml`.
 
-**This skill owns `hard_gates.equity_deleveraging` and writes back that key only.**
-`macro-refresh` owns every other key in the file and must not step this gate — double-stepping
-would corrupt the release streak. Split-key ownership of one file is the same pattern already
+**This skill owns `hard_gates.equity_deleveraging` and the `breadth` block, and writes back
+those two keys only.** When breadth was computed, update `breadth.last_reading` with the
+result's fields and today's date; when it was skipped, leave the block untouched. `macro-refresh`
+owns every other key in the file and must not step this gate — double-stepping would corrupt
+the release streak. Split-key ownership of one file is the same pattern already
 used for `watchlist.json` (`macro-refresh` owns `ntm`, `weekly-review` owns the rest), and works
 for the same reason: the writers touch disjoint keys.
 

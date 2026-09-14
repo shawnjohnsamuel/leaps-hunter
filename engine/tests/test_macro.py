@@ -15,6 +15,9 @@ from engine.macro import (
     inflation_shock_trigger,
     net_liquidity_contracting,
     net_liquidity_series,
+    breadth_needed,
+    compute_breadth,
+    equity_deleveraging_escalated,
     percentile_rank,
     spx_pct_vs_200dma,
     step_hard_gate,
@@ -144,6 +147,83 @@ class SpxPctVs200dmaTests(unittest.TestCase):
         closes = [100.0] * 199 + [107.0]
         pct = spx_pct_vs_200dma(closes)
         self.assertFalse(equity_deleveraging_trigger(33, 32, pct, 30, CFG))
+
+
+class BreadthNeededTests(unittest.TestCase):
+    def test_calm_market_inactive_gate_skips_breadth(self):
+        self.assertFalse(breadth_needed(16, 15, 7.0, gate_active=False, cfg=CFG))
+
+    def test_escalation_requires_breadth(self):
+        self.assertTrue(breadth_needed(33, 32, -11, gate_active=False, cfg=CFG))
+
+    def test_active_gate_requires_breadth_even_when_calm(self):
+        # The release check needs a fresh reading; skipping it here is the
+        # deadlock ADR 0016 closes.
+        self.assertTrue(breadth_needed(16, 15, 7.0, gate_active=True, cfg=CFG))
+
+    def test_escalated_matches_trigger_precondition(self):
+        # Skipping breadth must never change a trigger outcome.
+        for vix, prev, spx in [(33, 32, -11), (33, 20, -11), (33, 32, -5), (16, 15, 7.0)]:
+            if not equity_deleveraging_escalated(vix, prev, spx, CFG):
+                self.assertFalse(equity_deleveraging_trigger(vix, prev, spx, None, CFG))
+
+
+def _series(n, start=100.0, last=None):
+    days = [f"2025-{1 + i // 28:02d}-{1 + i % 28:02d}" for i in range(n)]
+    closes = [start] * n
+    if last is not None:
+        closes[-1] = last
+    return list(zip(days, closes))
+
+
+class ComputeBreadthTests(unittest.TestCase):
+    def setUp(self):
+        self.up = _series(200, last=110.0)
+        self.down = _series(200, last=90.0)
+        self.date = self.up[-1][0]
+
+    def test_percentage_over_computed_names(self):
+        data = {"A": self.up, "B": self.up, "C": self.up, "D": self.down}
+        r = compute_breadth(data, ["A", "B", "C", "D"], CFG)
+        self.assertTrue(r.available)
+        self.assertAlmostEqual(r.pct_above_200dma, 75.0)
+        self.assertEqual(r.as_of, self.date)
+
+    def test_lagging_feed_is_excluded_not_mixed_in(self):
+        stale = self.up[:-1] + [("1999-01-01", 500.0)]
+        universe = [f"S{i}" for i in range(20)]
+        data = {s: self.down for s in universe[:19]}
+        data["S19"] = stale
+        r = compute_breadth(data, universe, CFG)
+        self.assertEqual(r.names_on_date, 19)
+        self.assertEqual(r.pct_above_200dma, 0.0)
+
+    def test_coverage_below_floor_is_unavailable(self):
+        universe = [f"S{i}" for i in range(10)]
+        data = {s: self.up for s in universe[:8]}
+        r = compute_breadth(data, universe, CFG)
+        self.assertFalse(r.available)
+        self.assertIsNone(r.pct_above_200dma)
+        self.assertIn("coverage", r.reason)
+
+    def test_short_history_excluded_without_penalizing_coverage(self):
+        universe = [f"S{i}" for i in range(10)]
+        data = {s: self.up for s in universe[:9]}
+        data["S9"] = self.up[-50:]
+        r = compute_breadth(data, universe, CFG)
+        self.assertTrue(r.available)
+        self.assertEqual(r.names_short_history, 1)
+        self.assertEqual(r.names_computed, 9)
+        self.assertAlmostEqual(r.coverage, 1.0)
+
+    def test_no_data_is_unavailable(self):
+        r = compute_breadth({}, ["A"], CFG)
+        self.assertFalse(r.available)
+
+    def test_unavailable_breadth_fails_the_gate_closed_end_to_end(self):
+        r = compute_breadth({}, ["A"], CFG)
+        self.assertTrue(equity_deleveraging_trigger(33, 32, -11, r.pct_above_200dma, CFG))
+        self.assertFalse(equity_deleveraging_release_met(20, r.pct_above_200dma, CFG))
 
 
 class PercentileRankTests(unittest.TestCase):

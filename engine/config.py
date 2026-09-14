@@ -2,9 +2,12 @@
 production copy) is the single source of every threshold. Add a new
 threshold here, never as a literal in another engine module.
 
-config.example.yaml is a byte-identical extraction of §20 from
-framework/v7.md — it exists for tests and as a template, and is not edited
-by hand; if §20 changes, re-extract it. The deployed file (state/config.yaml
+config.example.yaml is an extraction of §20 from framework/v7.md — it
+exists for tests and as a template; if §20 changes, re-extract it. Its one
+deliberate difference from §20 is
+`macro_hard_gates.equity_deleveraging.breadth_min_coverage` (ADR 0016), a
+project threshold the spec never defined; v7.md itself stays verbatim, so
+re-extracting must carry that key forward. The deployed file (state/config.yaml
 in the private data repo, added in Phase 4) is a copy of this template plus
 one addition: portfolio.account_ref, naming which Robinhood account to
 query. NAV itself stays out of every config file — it is read live each run

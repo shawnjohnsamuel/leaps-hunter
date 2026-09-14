@@ -133,6 +133,31 @@ def spx_pct_vs_200dma(closes: Sequence[float], window: int = 200) -> float:
     return (closes[-1] - mean) / mean * 100.0
 
 
+def equity_deleveraging_escalated(
+    vix_now: float, vix_prev: float, spx_pct_below_200dma: float, cfg: dict
+) -> bool:
+    """True when VIX and the S&P both already fire — the only state in which
+    the trigger consults breadth at all."""
+    g = "macro_hard_gates.equity_deleveraging."
+    vix_fires = vix_now >= get(cfg, g + "vix_level") and vix_prev >= get(cfg, g + "vix_level")
+    spx_fires = spx_pct_below_200dma <= -get(cfg, g + "spx_pct_below_200dma")
+    return vix_fires and spx_fires
+
+
+def breadth_needed(
+    vix_now: float,
+    vix_prev: float,
+    spx_pct_below_200dma: float,
+    gate_active: bool,
+    cfg: dict,
+) -> bool:
+    """Whether this session must compute breadth: the trigger reads it only
+    when escalated, and the release check reads it only while the gate is
+    active. Every other session can skip the NYSE-wide pull entirely without
+    changing any gate outcome (ADR 0016)."""
+    return gate_active or equity_deleveraging_escalated(vix_now, vix_prev, spx_pct_below_200dma, cfg)
+
+
 def equity_deleveraging_trigger(
     vix_now: float,
     vix_prev: float,
@@ -145,14 +170,86 @@ def equity_deleveraging_trigger(
     unavailable, the gate is treated as TRIGGERED (fail closed) rather than
     left unresolved — the cost of a false positive here is a day without
     new positions, which §0 already calls a successful session."""
-    g = "macro_hard_gates.equity_deleveraging."
-    vix_fires = vix_now >= get(cfg, g + "vix_level") and vix_prev >= get(cfg, g + "vix_level")
-    spx_fires = spx_pct_below_200dma <= -get(cfg, g + "spx_pct_below_200dma")
-    if not (vix_fires and spx_fires):
+    if not equity_deleveraging_escalated(vix_now, vix_prev, spx_pct_below_200dma, cfg):
         return False
     if breadth_pct_above_200dma is None:
         return True
-    return breadth_pct_above_200dma < get(cfg, g + "breadth_pct_above_200dma")
+    return breadth_pct_above_200dma < get(
+        cfg, "macro_hard_gates.equity_deleveraging.breadth_pct_above_200dma"
+    )
+
+
+@dataclass(frozen=True)
+class BreadthResult:
+    """% of the universe above its own trailing-200-close mean, or a stated
+    reason it could not be computed. Callers pass `pct_above_200dma` to the
+    gate functions, which already treat `None` as fail-closed."""
+
+    available: bool
+    pct_above_200dma: float | None
+    as_of: str | None
+    universe_size: int
+    names_on_date: int
+    names_computed: int
+    names_short_history: int
+    coverage: float
+    reason: str | None = None
+
+
+def compute_breadth(
+    closes_by_symbol: dict[str, Sequence[tuple[str, float]]],
+    universe: Sequence[str],
+    cfg: dict,
+    window: int = 200,
+) -> BreadthResult:
+    """§6.1 NYSE breadth over `universe`, each symbol's (date, close) pairs
+    oldest-first.
+
+    The reference date is the most common latest-bar date across the
+    universe. Symbols whose feed ends on a different date are treated as
+    missing rather than mixed in — a lagging feed (a full-session stall in
+    Robinhood's daily bars was observed 2026-09-08) would otherwise blend
+    two sessions into one reading.
+
+    Coverage is measured on data retrieval (symbols present on the reference
+    date / universe size), not on history length: a recent listing without
+    200 closes is structurally uncomputable, not a data failure, so it is
+    counted in `names_short_history` and excluded without penalizing
+    coverage."""
+    universe_size = len(universe)
+    last_dates = {
+        s: closes_by_symbol[s][-1][0] for s in universe if closes_by_symbol.get(s)
+    }
+    if not last_dates:
+        return BreadthResult(False, None, None, universe_size, 0, 0, 0, 0.0,
+                             reason="no symbol in the universe returned data")
+
+    counts: dict[str, int] = {}
+    for d in last_dates.values():
+        counts[d] = counts.get(d, 0) + 1
+    as_of = max(counts, key=lambda d: (counts[d], d))
+
+    on_date = [s for s, d in last_dates.items() if d == as_of]
+    coverage = len(on_date) / universe_size
+    floor = get(cfg, "macro_hard_gates.equity_deleveraging.breadth_min_coverage")
+    if coverage < floor:
+        return BreadthResult(False, None, as_of, universe_size, len(on_date), 0, 0, coverage,
+                             reason=f"coverage {coverage:.1%} below the {floor:.0%} floor")
+
+    above = computed = short = 0
+    for s in on_date:
+        closes = [c for _, c in closes_by_symbol[s]]
+        if len(closes) < window:
+            short += 1
+            continue
+        computed += 1
+        if closes[-1] > sum(closes[-window:]) / window:
+            above += 1
+    if not computed:
+        return BreadthResult(False, None, as_of, universe_size, len(on_date), 0, short, coverage,
+                             reason=f"no symbol had {window} closes")
+    return BreadthResult(True, above / computed * 100.0, as_of, universe_size,
+                         len(on_date), computed, short, coverage)
 
 
 def equity_deleveraging_release_met(

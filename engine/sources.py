@@ -170,6 +170,28 @@ def compute_ntm_eps_revision(payload: dict, as_of: date) -> NTMResult:
     )
 
 
+# ---------------------------------------------- Robinhood (parse only) -----
+
+def parse_robinhood_daily_closes(payload: dict) -> dict[str, list[tuple[str, float]]]:
+    """(date, close) pairs per symbol, oldest first, from a
+    `get_equity_historicals` / `get_index_historicals` payload the calling
+    skill already fetched over MCP — this still never calls Robinhood.
+
+    Interpolated bars are dropped: Robinhood synthesizes them to fill gaps
+    and they carry no new price information, so counting one as a close
+    would drag a symbol's 200-close mean toward a repeated value."""
+    out: dict[str, list[tuple[str, float]]] = {}
+    for result in (payload.get("data") or {}).get("results") or []:
+        pairs = [
+            (bar["begins_at"][:10], float(bar["close_price"]))
+            for bar in result.get("bars") or []
+            if not bar.get("interpolated") and bar.get("close_price") not in (None, "")
+        ]
+        if pairs:
+            out[result["symbol"]] = sorted(pairs)
+    return out
+
+
 # --------------------------------------------------------- SEC EDGAR -----
 
 def fetch_sec_company_concept(cik10: str, taxonomy: str, tag: str) -> dict:

@@ -35,7 +35,6 @@ Identical to `weekly-review`'s former §1 — pull fresh series and feed them in
 | DFII30 | `fetch_fred_series` | §6.2 real-30y percentile |
 | WALCL, WTREGEN, RRPONTSYD | `fetch_fred_series` each | `engine.macro.net_liquidity_series` |
 | Shiller CAPE | `engine.sources.fetch_cape_series` | §6.2 CAPE percentile |
-| Breadth | `state/macro-latest.json`'s `breadth` block | Desktop-cadence job, separate from this one (ADR 0012) |
 
 Compute the trigger/release booleans for **`credit_stress` and `inflation_duration_shock` only**,
 call `engine.macro.step_hard_gate` for those two against the prior state in
@@ -50,8 +49,24 @@ streak. This also fixes a cadence error: `release_consecutive_closes` counts *tr
 and a gate stepped once per weekly run of this skill would have taken five weeks to release
 instead of five sessions.
 
-Leave the `hard_gates.equity_deleveraging` block exactly as you found it, and preserve every other
-key you did not compute rather than rewriting the file wholesale.
+Leave the `hard_gates.equity_deleveraging` **and `breadth`** blocks exactly as you found them —
+`daily-screen` owns both (ADRs 0015, 0016) — and preserve every other key you did not compute
+rather than rewriting the file wholesale.
+
+### 1b. NYSE breadth universe refresh
+
+`daily-screen` computes breadth over `state/nyse-constituents.json`, but it can't rebuild that
+list itself: the membership source is Massive, which is a desktop extension that cloud routines
+can't attach. Refresh it here, weekly. Page through Massive's `/v3/reference/tickers` with
+`type=CS`, `market=stocks`, `exchange=XNYS`, `active=true`, `limit=1000`, following the cursor
+until no next page is returned. Rewrite the file's `tickers`, `count` and `as_of`, keeping the
+rest of its fields. Keep the list mechanical — no hand filtering.
+
+Sanity-check before writing: the 2026-09-14 baseline was **1,750** names. If the new count
+differs by more than ~5%, don't write it; report the difference instead. A sudden drop is far more
+likely to mean a truncated page or an API change than 90 real delistings in a week. Normal churn is
+a handful of names. If Massive is unreachable, leave the existing file as it is and say so;
+membership moves slowly, so a list that's a few weeks old barely changes the breadth reading.
 
 ### 2. NTM estimate-revision refresh (§10 patterns 2 & 3)
 

@@ -28,6 +28,11 @@ class ConfigTemplateTests(unittest.TestCase):
         self.assertEqual(
             get(self.cfg, "macro_hard_gates.equity_deleveraging.spx_pct_below_200dma"), 10
         )
+        # Project addition, not in §20 (ADR 0016) — pinned so a re-extraction
+        # of §20 that drops it fails here instead of breaking compute_breadth.
+        self.assertEqual(
+            get(self.cfg, "macro_hard_gates.equity_deleveraging.breadth_min_coverage"), 0.90
+        )
 
     def test_restricted_regime(self):
         self.assertEqual(get(self.cfg, "restricted_regime.trigger_R"), 3)

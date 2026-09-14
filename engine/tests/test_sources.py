@@ -4,7 +4,12 @@ Vantage in particular throttled after two rapid requests on 2026-09-03)."""
 import unittest
 from datetime import date
 
-from engine.sources import _parse_fred_csv, _parse_multpl_cape, compute_ntm_eps_revision
+from engine.sources import (
+    _parse_fred_csv,
+    _parse_multpl_cape,
+    compute_ntm_eps_revision,
+    parse_robinhood_daily_closes,
+)
 
 FRED_FIXTURE = (
     "observation_date,BAMLH0A0HYM2\n"
@@ -113,6 +118,27 @@ class NtmEpsRevisionTests(unittest.TestCase):
         r = compute_ntm_eps_revision(AV_ONE_FORWARD_YEAR_FIXTURE, AS_OF)
         self.assertFalse(r.available)
         self.assertIn("1 forward fiscal year", r.reason)
+
+
+class RobinhoodDailyClosesTests(unittest.TestCase):
+    PAYLOAD = {"data": {"results": [
+        {"symbol": "AAA", "bars": [
+            {"begins_at": "2026-09-11T00:00:00Z", "close_price": "12.00"},
+            {"begins_at": "2026-09-09T00:00:00Z", "close_price": "10.00"},
+            {"begins_at": "2026-09-10T00:00:00Z", "close_price": "10.00", "interpolated": True},
+        ]},
+        {"symbol": "EMPTY", "bars": []},
+    ]}}
+
+    def test_drops_interpolated_and_sorts_oldest_first(self):
+        out = parse_robinhood_daily_closes(self.PAYLOAD)
+        self.assertEqual(out["AAA"], [("2026-09-09", 10.0), ("2026-09-11", 12.0)])
+
+    def test_symbol_without_bars_is_absent_not_empty(self):
+        self.assertNotIn("EMPTY", parse_robinhood_daily_closes(self.PAYLOAD))
+
+    def test_malformed_payload_yields_nothing(self):
+        self.assertEqual(parse_robinhood_daily_closes({}), {})
 
 
 if __name__ == "__main__":

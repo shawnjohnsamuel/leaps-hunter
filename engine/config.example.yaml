@@ -25,6 +25,7 @@ macro_hard_gates:
     release_vix_below: 25
     release_breadth_above: 45
     release_consecutive_closes: 5
+    breadth_min_coverage: 0.90
 
 restricted_regime:
   components: [cape_gt_95pct, hy_oas_lt_20pct, real_30y_gt_90pct, net_liquidity_contracting]
