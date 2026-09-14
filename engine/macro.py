@@ -113,6 +113,26 @@ def inflation_shock_release_met(
 
 # --------------------------------------------- gate 3: equity deleveraging ---
 
+def spx_pct_vs_200dma(closes: Sequence[float], window: int = 200) -> float:
+    """Signed % of the latest close relative to its trailing `window`-close
+    mean: NEGATIVE when below the average, e.g. -11.0 means 11% below.
+
+    This is the exact value `equity_deleveraging_trigger`'s
+    `spx_pct_below_200dma` parameter expects. That parameter's name reads like
+    a positive magnitude, and computing `(mean - close) / mean` — the natural
+    reading of "percent below" — inverts the sign so a real 12% drawdown
+    arrives as +12 and the gate never fires. Found 2026-09-14 in a manual
+    macro-refresh that had done exactly that; always call this instead of
+    deriving the value in prose.
+
+    `closes` is oldest-first and must include the latest close as its last
+    element."""
+    if len(closes) < window:
+        raise ValueError(f"need at least {window} closes, got {len(closes)}")
+    mean = sum(closes[-window:]) / window
+    return (closes[-1] - mean) / mean * 100.0
+
+
 def equity_deleveraging_trigger(
     vix_now: float,
     vix_prev: float,

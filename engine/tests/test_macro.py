@@ -16,6 +16,7 @@ from engine.macro import (
     net_liquidity_contracting,
     net_liquidity_series,
     percentile_rank,
+    spx_pct_vs_200dma,
     step_hard_gate,
 )
 
@@ -112,6 +113,37 @@ class EquityDeleveragingTests(unittest.TestCase):
 
     def test_release_breadth_unavailable_fails_closed(self):
         self.assertFalse(equity_deleveraging_release_met(20, None, CFG))
+
+
+class SpxPctVs200dmaTests(unittest.TestCase):
+    def test_below_average_is_negative(self):
+        closes = [100.0] * 199 + [88.0]
+        self.assertLess(spx_pct_vs_200dma(closes), 0)
+
+    def test_above_average_is_positive(self):
+        closes = [100.0] * 199 + [110.0]
+        self.assertGreater(spx_pct_vs_200dma(closes), 0)
+
+    def test_uses_only_trailing_window(self):
+        closes = [1.0] * 50 + [100.0] * 199 + [90.0]
+        self.assertAlmostEqual(spx_pct_vs_200dma(closes), (90.0 - 99.95) / 99.95 * 100.0)
+
+    def test_short_history_raises(self):
+        with self.assertRaises(ValueError):
+            spx_pct_vs_200dma([100.0] * 199)
+
+    def test_real_drawdown_fires_the_gate_end_to_end(self):
+        # Regression for the inverted-sign bug: a genuine ~12% drawdown with
+        # VIX elevated and breadth weak must trigger. With the sign flipped
+        # this value arrives as +12 and the gate stays silent.
+        closes = [100.0] * 199 + [87.0]
+        pct = spx_pct_vs_200dma(closes)
+        self.assertTrue(equity_deleveraging_trigger(33, 32, pct, 30, CFG))
+
+    def test_market_above_average_does_not_fire_even_with_high_vix(self):
+        closes = [100.0] * 199 + [107.0]
+        pct = spx_pct_vs_200dma(closes)
+        self.assertFalse(equity_deleveraging_trigger(33, 32, pct, 30, CFG))
 
 
 class PercentileRankTests(unittest.TestCase):

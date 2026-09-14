@@ -68,7 +68,12 @@ gate's inputs move *daily*, and they are reachable from a cloud routine: Robinho
 (SPX, enough daily history for a trailing 200-session mean). Assemble:
 
 - `vix_now`, `vix_prev`
-- `spx_pct_below_200dma` — SPX latest close vs its trailing 200-session mean
+- `spx_pct_below_200dma` — **call `engine.macro.spx_pct_vs_200dma(closes)`** with SPX's daily
+  closes oldest-first, latest settled close last. Never compute this yourself: the engine
+  expects a *signed* value, **negative when SPX is below its average** (−11 means 11% below),
+  and the parameter's name reads like a positive magnitude. The natural hand-derivation
+  `(mean − close) / mean` inverts the sign, so a real 12% drawdown arrives as +12 and the gate
+  silently never fires. This exact mistake was made in a manual refresh on 2026-09-10.
 - `breadth_pct_above_200dma` — read `macro-latest.json`'s `breadth` block; if it is missing or
   older than `stale_after_days`, pass `None` and let ADR 0012's fail-closed rule apply rather
   than re-deriving it
