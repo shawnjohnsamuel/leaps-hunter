@@ -15,9 +15,13 @@ from engine.macro import (
     inflation_shock_trigger,
     net_liquidity_contracting,
     net_liquidity_series,
+    advance_hard_gate,
     breadth_needed,
     compute_breadth,
+    credit_proxy_check,
+    credit_stress_daily,
     equity_deleveraging_escalated,
+    inflation_shock_daily,
     percentile_rank,
     spx_pct_vs_200dma,
     step_hard_gate,
@@ -291,6 +295,102 @@ class RestrictedRegimeTests(unittest.TestCase):
         two = self._run(cape_now=99, credit_now=10, real30_now=10, liquidity_contracting=False)
         self.assertEqual(two.R, 2)
         self.assertFalse(two.restricted)
+
+
+def _dated(values, start_day=1):
+    return [(f"2026-01-{start_day + i:02d}" if start_day + i <= 31 else f"2026-02-{start_day + i - 31:02d}", v)
+            for i, v in enumerate(values)]
+
+
+class AdvanceHardGateTests(unittest.TestCase):
+    CALM = (False, True)
+
+    def rows(self, *conds):
+        return [(d, t, r) for (d, _), (t, r) in zip(_dated([0] * len(conds)), conds)]
+
+    def test_steps_once_per_observation_after_cursor(self):
+        rows = self.rows(self.CALM, self.CALM, self.CALM)
+        _, cursor, steps = advance_hard_gate(None, rows, rows[0][0], 5)
+        self.assertEqual((cursor, steps), (rows[2][0], 2))
+
+    def test_same_day_rerun_steps_zero_times(self):
+        rows = self.rows(*[self.CALM] * 3)
+        active = HardGateState(active=True, consecutive_release_days=0)
+        state, cursor, _ = advance_hard_gate(active, rows, "2025-12-31", 5)
+        again, cursor2, steps = advance_hard_gate(state, rows, cursor, 5)
+        self.assertEqual((again, cursor2, steps), (state, cursor, 0))
+        self.assertEqual(again.consecutive_release_days, 3)
+
+    def test_five_real_closes_release_an_active_gate(self):
+        active = HardGateState(active=True, consecutive_release_days=0)
+        state, _, _ = advance_hard_gate(active, self.rows(*[self.CALM] * 5), "2025-12-31", 5)
+        self.assertFalse(state.active)
+
+    def test_four_closes_do_not(self):
+        active = HardGateState(active=True, consecutive_release_days=0)
+        state, _, _ = advance_hard_gate(active, self.rows(*[self.CALM] * 4), "2025-12-31", 5)
+        self.assertEqual(state, HardGateState(active=True, consecutive_release_days=4))
+
+    def test_trigger_that_faded_before_the_weekly_run_is_still_caught(self):
+        # Regression for once-per-run stepping: day 1 triggers, days 2-5 are
+        # calm. Stepping only the latest (calm) day left the gate inactive.
+        rows = self.rows((True, False), self.CALM, self.CALM, self.CALM, self.CALM)
+        state, _, _ = advance_hard_gate(None, rows, "2025-12-31", 5)
+        self.assertEqual(state, HardGateState(active=True, consecutive_release_days=4))
+
+    def test_broken_streak_resets(self):
+        active = HardGateState(active=True, consecutive_release_days=0)
+        rows = self.rows(self.CALM, self.CALM, (False, False), self.CALM)
+        state, _, _ = advance_hard_gate(active, rows, "2025-12-31", 5)
+        self.assertEqual(state.consecutive_release_days, 1)
+
+
+class DailyConditionTests(unittest.TestCase):
+    def test_credit_uses_twenty_observation_lookback(self):
+        rows = credit_stress_daily(_dated([3.0] * 25), CFG)
+        self.assertEqual(len(rows), 5)
+        self.assertEqual(rows[0][0], _dated([3.0] * 25)[20][0])
+
+    def test_credit_widening_triggers_on_its_own_day(self):
+        rows = credit_stress_daily(_dated([3.2] * 20 + [5.0]), CFG)
+        self.assertEqual(rows, [(_dated([0] * 21)[20][0], True, False)])
+
+    def test_inflation_aligns_dates_and_keeps_each_series_window(self):
+        real, nominal, be = _dated([1.0] * 11 + [1.5]), _dated([4.0] * 11 + [4.5]), _dated([2.0] * 11 + [2.3])
+        missing = be.pop(5)[0]
+        rows = inflation_shock_daily(real, nominal, be, CFG)
+        self.assertNotIn(missing, [d for d, _, _ in rows])
+        self.assertEqual(rows[-1], (real[-1][0], True, False))
+
+
+class CreditProxyTests(unittest.TestCase):
+    def test_calm_ratio_does_not_trip(self):
+        r = credit_proxy_check(_dated([80.0] * 21), _dated([82.0] * 21), CFG)
+        self.assertTrue(r.available)
+        self.assertFalse(r.tripped)
+        self.assertAlmostEqual(r.drawdown_pct, 0.0)
+
+    def test_credit_selloff_trips(self):
+        r = credit_proxy_check(_dated([80.0] * 20 + [78.4]), _dated([82.0] * 21), CFG)
+        self.assertTrue(r.tripped)
+        self.assertAlmostEqual(r.drawdown_pct, 2.0)
+
+    def test_rates_move_hitting_both_legs_does_not_trip(self):
+        # The 2026-09-11 case: raw HYG fell on a yield spike while spreads
+        # tightened. When the hedge falls in step, the ratio is unchanged.
+        r = credit_proxy_check(_dated([80.0] * 20 + [78.4]), _dated([82.0] * 20 + [80.36]), CFG)
+        self.assertFalse(r.tripped)
+
+    def test_short_history_is_unavailable_not_tripped(self):
+        r = credit_proxy_check(_dated([80.0] * 10), _dated([82.0] * 10), CFG)
+        self.assertEqual((r.available, r.tripped), (False, False))
+
+    def test_dates_missing_from_the_hedge_are_skipped(self):
+        credit, hedge = _dated([80.0] * 22), _dated([82.0] * 22)
+        hedge.pop(10)
+        r = credit_proxy_check(credit, hedge, CFG)
+        self.assertTrue(r.available)
+        self.assertEqual(r.as_of, credit[-1][0])
 
 
 if __name__ == "__main__":

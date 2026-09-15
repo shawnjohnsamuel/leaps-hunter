@@ -36,10 +36,31 @@ Identical to `weekly-review`'s former §1 — pull fresh series and feed them in
 | WALCL, WTREGEN, RRPONTSYD | `fetch_fred_series` each | `engine.macro.net_liquidity_series` |
 | Shiller CAPE | `engine.sources.fetch_cape_series` | §6.2 CAPE percentile |
 
-Compute the trigger/release booleans for **`credit_stress` and `inflation_duration_shock` only**,
-call `engine.macro.step_hard_gate` for those two against the prior state in
-`state/macro-latest.json`, and compute `engine.macro.compute_restricted_regime` for `R`. Write
-the result back to `state/macro-latest.json` with `run_type: "macro_refresh"`.
+Advance **`credit_stress` and `inflation_duration_shock` only**, one trading-day close at a time
+(ADR 0017) — never once per run:
+
+1. Build each gate's per-day conditions from the full fetched series:
+   `engine.macro.credit_stress_daily(BAMLH0A0HYM2, cfg)` and
+   `engine.macro.inflation_shock_daily(DFII10, DGS10, T5YIFR, cfg)`. Each row is
+   `(date, triggered, release_met)` computed from *that day's* inputs.
+2. Call `engine.macro.advance_hard_gate(prev_state, rows, after=gate.last_observation_date,
+   release_streak_required=...)`, with the prior `active` / `consecutive_release_days` from
+   `state/macro-latest.json` and `release_consecutive_closes` from config. It steps once for every
+   close after the cursor and returns `(state, new_cursor, steps)`.
+3. Write back `active`, `consecutive_release_days`, and `last_observation_date = new_cursor`, and
+   record `steps` in the note. **Zero steps is normal** on a same-day re-run and means nothing
+   new was published. Never step again to "refresh" it.
+
+Why this matters: stepping once per weekly run made a five-close release take five weeks,
+let a trigger that fired and faded between Sundays go unseen, and advanced the streak again on
+every same-day re-run (three test runs on 2026-09-11 would each have counted a "close").
+
+**If `last_observation_date` is missing, stop and report it — do not guess a start date.** A
+cursor that's too early double-counts closes already reflected in the stored state, which can
+release an active gate early. That fails open.
+
+Then compute `engine.macro.compute_restricted_regime` for `R`. Write the result back to
+`state/macro-latest.json` with `run_type: "macro_refresh"`.
 
 **Do not compute or step `hard_gates.equity_deleveraging` — `daily-screen` owns that key.**
 That gate's inputs (VIX, SPX vs its 200dma) move daily and, unlike everything else in this table,

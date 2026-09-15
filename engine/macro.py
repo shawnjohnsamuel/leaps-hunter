@@ -111,6 +111,71 @@ def inflation_shock_release_met(
     )
 
 
+# ------------------------------------- daily replay for gates 1 & 2 (ADR 0017) ---
+#
+# Gates 1 and 2 are refreshed by a weekly desktop job, but release_consecutive_closes
+# counts trading-day closes. Stepping once per run made a 5-close release take 5
+# weeks, let a trigger that fired and faded between runs go unseen, and advanced
+# the streak again on every same-day re-run. Each run now replays every
+# observation since the last one it processed, using that day's own inputs.
+
+DailyCondition = tuple[str, bool, bool]
+
+
+def credit_stress_daily(hy_oas: Sequence[tuple[str, float]], cfg: dict, lookback: int = 20) -> list[DailyCondition]:
+    """(date, triggered, release_met) for each HY OAS observation that has
+    `lookback` observations before it, oldest first."""
+    s = sorted(hy_oas)
+    return [
+        (s[i][0], credit_stress_trigger(s[i][1], s[i - lookback][1], cfg), credit_stress_release_met(s[i][1], cfg))
+        for i in range(lookback, len(s))
+    ]
+
+
+def inflation_shock_daily(
+    real10: Sequence[tuple[str, float]],
+    nominal10: Sequence[tuple[str, float]],
+    breakeven_5y5y: Sequence[tuple[str, float]],
+    cfg: dict,
+    lookback: int = 10,
+) -> list[DailyCondition]:
+    """(date, triggered, release_met) for each date all three series report.
+    Each delta is taken within its own series, `lookback` observations back, so
+    a day one series skips doesn't shift the others' windows."""
+    series = [sorted(real10), sorted(nominal10), sorted(breakeven_5y5y)]
+    index = [{d: i for i, (d, _) in enumerate(s)} for s in series]
+    common = sorted(set(index[0]) & set(index[1]) & set(index[2]))
+    out = []
+    for d in common:
+        pos = [idx[d] for idx in index]
+        if min(pos) < lookback:
+            continue
+        deltas = [s[p][1] - s[p - lookback][1] for s, p in zip(series, pos)]
+        out.append((d, inflation_shock_trigger(*deltas, cfg), inflation_shock_release_met(*deltas, cfg)))
+    return out
+
+
+def advance_hard_gate(
+    prev: HardGateState | None,
+    daily: Sequence[DailyCondition],
+    after: str,
+    release_streak_required: int,
+) -> tuple[HardGateState, str, int]:
+    """Step `prev` once for every observation dated strictly after `after`.
+
+    Returns (state, new_cursor, steps). Idempotent: re-running with the returned
+    cursor steps zero times, so a second refresh on the same day can't advance
+    the release streak twice."""
+    state = prev or HardGateState(active=False)
+    cursor, steps = after, 0
+    for d, triggered, release_met in sorted(daily):
+        if d <= after:
+            continue
+        state = step_hard_gate(state, triggered, release_met, release_streak_required)
+        cursor, steps = d, steps + 1
+    return state, cursor, steps
+
+
 # --------------------------------------------- gate 3: equity deleveraging ---
 
 def spx_pct_vs_200dma(closes: Sequence[float], window: int = 200) -> float:
@@ -250,6 +315,48 @@ def compute_breadth(
                              reason=f"no symbol had {window} closes")
     return BreadthResult(True, above / computed * 100.0, as_of, universe_size,
                          len(on_date), computed, short, coverage)
+
+
+# ----------------------------------------- credit early warning (ADR 0017) -----
+
+@dataclass(frozen=True)
+class CreditProxyResult:
+    """A daily early warning for §6.1's credit gate, which is only refreshed
+    weekly. Never a gate: it can prompt a human to run macro-refresh, but it
+    must not block or approve anything on its own."""
+
+    available: bool
+    tripped: bool
+    drawdown_pct: float | None
+    as_of: str | None
+    reason: str | None = None
+
+
+def credit_proxy_check(
+    credit_closes: Sequence[tuple[str, float]],
+    hedge_closes: Sequence[tuple[str, float]],
+    cfg: dict,
+) -> CreditProxyResult:
+    """How far the high-yield/short-Treasury price ratio sits below its high
+    over the trailing `lookback_sessions`.
+
+    The ratio, not the credit ETF alone: calibrated on 2025-09..2026-09, raw
+    HYG correlated 0.47 with 10Y yield changes and read 1.65% off its high on
+    2026-09-11 while HY OAS had tightened 6bp — a rates move posing as credit
+    stress. Dividing by SHY cut that to 0.24 and lifted correlation with HY OAS
+    changes from 0.54 to 0.74. SHY is deliberately short: a duration-matched
+    hedge over-corrects (HYG/IEI went negative, -0.40), which would understate a
+    shock where yields and spreads rise together."""
+    g = "tripwires.credit_proxy."
+    lookback = get(cfg, g + "lookback_sessions")
+    hedge = dict(hedge_closes)
+    ratio = [(d, c / hedge[d]) for d, c in sorted(credit_closes) if hedge.get(d)]
+    if len(ratio) <= lookback:
+        return CreditProxyResult(False, False, None, ratio[-1][0] if ratio else None,
+                                 reason=f"need {lookback + 1} aligned sessions, got {len(ratio)}")
+    window = [v for _, v in ratio[-(lookback + 1):]]
+    drawdown = (max(window) - window[-1]) / max(window) * 100.0
+    return CreditProxyResult(True, drawdown >= get(cfg, g + "drawdown_pct"), drawdown, ratio[-1][0])
 
 
 def equity_deleveraging_release_met(

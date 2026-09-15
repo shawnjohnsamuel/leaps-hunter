@@ -119,6 +119,28 @@ regardless of what anything below finds. Say so plainly and stop candidate evalu
 positions may still be reviewed under §16's management rules, which is a separate activity from
 this screen.
 
+**1e. Credit early warning — every run, warning only (ADR 0017).** The credit gate (1b) is only
+as fresh as the last weekly `macro-refresh`, so a spread blowout mid-week would otherwise go unseen
+for days. Pull daily bars for the configured `tripwires.credit_proxy.symbol` and `hedge_symbol`
+(HYG and SHY) in **one** `get_equity_historicals` call, `interval: day`, with `start_time` about
+45 calendar days back. Parse with `engine.sources.parse_robinhood_daily_closes` and call
+`engine.macro.credit_proxy_check(credit_closes, hedge_closes, cfg)`.
+
+- **Tripped:** lead the notification (after any FAILED/INCOMPLETE line, before the staleness line)
+  with `⚠️ CREDIT STRESS LIKELY — HYG/SHY −<drawdown>% vs 20-session high. Run macro-refresh now.`
+  Record `macro.credit_proxy` in the daily JSON (`tripped`, `drawdown_pct`, `as_of`).
+- **Not tripped:** record it in the daily JSON; no notification line.
+- **Unavailable** (fetch failed or short history): record the reason and add one plain line to the
+  notification. Don't retry more than once.
+
+**This never changes a gate, a threshold, or a verdict.** It is a prompt for a human to refresh
+the real §6.1 inputs, not a substitute for them. Don't set `hard_gates.credit_stress.active`,
+don't stop candidate evaluation, and don't touch the score threshold because it fired.
+
+It's the HYG/SHY *ratio*, not HYG alone, because raw HYG also moves with Treasury yields. On
+2026-09-11 raw HYG sat 1.65% off its high purely on a 33bp jump in the 10-year while HY spreads
+*tightened*. That would have been a false alarm, and the ratio read 0.89%. Calibration is in ADR 0017.
+
 ## 2. Per-candidate screen — cheapest checks first (§4.2's own ordering)
 
 For each `state/watchlist.json` entry with `status` in `{"active"}` (skip

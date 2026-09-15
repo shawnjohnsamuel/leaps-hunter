@@ -33,6 +33,11 @@ class ConfigTemplateTests(unittest.TestCase):
         self.assertEqual(
             get(self.cfg, "macro_hard_gates.equity_deleveraging.breadth_min_coverage"), 0.90
         )
+        # Also a project addition (ADR 0017), pinned for the same reason.
+        self.assertEqual(
+            get(self.cfg, "tripwires.credit_proxy"),
+            {"symbol": "HYG", "hedge_symbol": "SHY", "lookback_sessions": 20, "drawdown_pct": 1.5},
+        )
 
     def test_restricted_regime(self):
         self.assertEqual(get(self.cfg, "restricted_regime.trigger_R"), 3)

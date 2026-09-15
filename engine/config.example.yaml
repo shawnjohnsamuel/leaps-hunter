@@ -143,3 +143,11 @@ watchlist:
   target_size: [15, 25]
   mechanisms: [bottleneck, control_plane, narrative_reversal, sanctioned_secondary]
   saaspocalypse_as_core_mechanism: false
+
+# Project addition, not in §20 (ADR 0017). An early warning only -- never a gate.
+tripwires:
+  credit_proxy:
+    symbol: HYG
+    hedge_symbol: SHY
+    lookback_sessions: 20
+    drawdown_pct: 1.5
