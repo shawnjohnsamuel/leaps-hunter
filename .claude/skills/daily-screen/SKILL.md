@@ -42,20 +42,32 @@ CAPE and Alpha Vantage are egress-blocked from cloud routines (ADR 0014). Neithe
 `weekly-review` can refresh the slow-moving series in it. Read the `restricted_regime` block;
 never re-derive it.
 
-**1a. Staleness check.** Compare `as_of` to today:
+**1a. Staleness check.** Call `engine.macro.macro_staleness(last_refreshed, today, cfg)`, where
+`last_refreshed` is the top-level field in `state/macro-latest.json`. Act on `.band`:
 
-- **≤7 days** — current, use as-is.
-- **8–14 days** — use it, but record a `macro.staleness_flag` string in today's
+- **`current`** — use it as-is.
+- **`flag`** — use it, but record a `macro.staleness_flag` string in today's
   `daily/YYYY-MM-DD.json` *and* lead this run's notification with
-  `⚠️ MACRO STATE STALE (as_of: <date>) — run macro-refresh`. The R throttle sets
-  `score_threshold`, which is the binding constraint on most near-misses, so a stale read
-  silently moves every verdict. Flag it where a human will actually see it, not only in the JSON.
-- **>14 days** — stop with `NO TRADE — DATA INSUFFICIENT`, naming `state/macro-latest.json` as
-  the missing input. Past two weeks the regime read is no longer evidence about today; fail
-  closed rather than scoring against a number nobody has verified (§0).
+  `⚠️ MACRO STATE STALE (last refreshed <date>, <n> days) — run macro-refresh`. The R throttle
+  sets `score_threshold`, the binding constraint on most near-misses, so a stale read silently
+  moves every verdict. Put it where a human will see it, not only in the JSON.
+- **`stop`** — stop with `NO TRADE — DATA INSUFFICIENT`, naming `state/macro-latest.json` as the
+  missing input. Past that point the regime read is no longer evidence about today; fail closed
+  rather than scoring against a number nobody has verified (§0).
 
-This mirrors §0.2's `last_stage_a_review` precondition — the two freshness clocks are symmetric
-by design.
+**Measure from `last_refreshed`, never from `as_of` (ADR 0018).** `as_of` is the oldest
+latest-print across the fetched series, and WALCL is weekly — dated Wednesday, published Thursday
+— so `as_of` is already 4–6 days old the moment a Sunday refresh finishes. Measuring the band
+against it flagged "8 calendar days old" on 2026-09-17 when the refresh had run on 09-14, and
+would have done so every Thursday and Friday. Whether each *source* is silently frozen is a
+different question, checked inside `macro-refresh` by `engine.macro.stale_sources`; if that check
+found anything, `macro-latest.json` says so and you should repeat it in the notification.
+
+If `last_refreshed` is absent (a file written before ADR 0018), fall back to `as_of`, and say in
+the notification that you did — the fallback reads several days pessimistic.
+
+The `flag`/`stop` bands mirror §0.2's `last_stage_a_review` precondition; the two freshness clocks
+are symmetric by design, and both now measure from when work last ran.
 
 **1b. Slow-moving gates — read, don't recompute.** `hard_gates.credit_stress` and
 `hard_gates.inflation_duration_shock` come from `macro-latest.json` as the last `macro-refresh`

@@ -151,3 +151,25 @@ tripwires:
     hedge_symbol: SHY
     lookback_sessions: 20
     drawdown_pct: 1.5
+
+# Project addition, not in §20 (ADR 0018). Staleness is measured from the last
+# macro-refresh RUN, not from the data's as_of: WALCL is weekly and CAPE monthly,
+# so as_of is legitimately days old the moment a refresh finishes.
+macro_staleness:
+  flag_after_days: 7
+  stop_after_days: 14
+  max_source_lag_days:
+    daily: 6
+    weekly: 12
+    monthly: 45
+  source_cadence:
+    BAMLH0A0HYM2: daily
+    BAA10Y: daily
+    DFII10: daily
+    DGS10: daily
+    T5YIFR: daily
+    DFII30: daily
+    RRPONTSYD: daily
+    WALCL: weekly
+    WTREGEN: weekly
+    CAPE: monthly

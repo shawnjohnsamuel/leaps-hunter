@@ -33,6 +33,11 @@ class ConfigTemplateTests(unittest.TestCase):
         self.assertEqual(
             get(self.cfg, "macro_hard_gates.equity_deleveraging.breadth_min_coverage"), 0.90
         )
+        # Project addition (ADR 0018): staleness bands and per-source cadence.
+        self.assertEqual(get(self.cfg, "macro_staleness.flag_after_days"), 7)
+        self.assertEqual(get(self.cfg, "macro_staleness.stop_after_days"), 14)
+        self.assertEqual(get(self.cfg, "macro_staleness.max_source_lag_days.weekly"), 12)
+        self.assertEqual(get(self.cfg, "macro_staleness.source_cadence.WALCL"), "weekly")
         # Also a project addition (ADR 0017), pinned for the same reason.
         self.assertEqual(
             get(self.cfg, "tripwires.credit_proxy"),

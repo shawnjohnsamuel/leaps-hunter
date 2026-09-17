@@ -17,6 +17,7 @@ expected to persist each gate's `HardGateState` in state/macro-latest.json
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date as _date
 from typing import Sequence
 
 from .config import get
@@ -109,6 +110,64 @@ def inflation_shock_release_met(
         and nominal10_delta_10d < _bp(get(cfg, g + "nominal_10y_bp_10d")) * frac
         and breakeven_delta_10d < _bp(get(cfg, g + "breakeven_5y5y_bp_10d")) * frac
     )
+
+
+# ----------------------------------------- staleness clocks (ADR 0018) -----
+#
+# Two different questions, previously conflated into one date. "Has anyone
+# refreshed lately?" is answered by the last macro-refresh RUN. "Is a source
+# silently frozen?" is answered per series against its own publication cadence.
+# Measuring the first against the data's `as_of` flagged stale every Thursday:
+# `as_of` is the oldest latest-print across all series, and WALCL is weekly
+# (dated Wednesday, published Thursday), so it is already days old the moment a
+# Sunday refresh finishes. Observed firing 2026-09-17 with a 2026-09-14 refresh.
+
+@dataclass(frozen=True)
+class StalenessResult:
+    days: int
+    band: str  # "current" | "flag" | "stop"
+    basis: str
+
+
+def macro_staleness(last_refreshed: str, today: str, cfg: dict) -> StalenessResult:
+    """Age of the macro state in calendar days since the last successful
+    `macro-refresh` run, and which of §1a's three bands that falls in."""
+    days = (_date.fromisoformat(today) - _date.fromisoformat(last_refreshed)).days
+    if days > get(cfg, "macro_staleness.stop_after_days"):
+        band = "stop"
+    elif days > get(cfg, "macro_staleness.flag_after_days"):
+        band = "flag"
+    else:
+        band = "current"
+    return StalenessResult(days, band, last_refreshed)
+
+
+@dataclass(frozen=True)
+class SourceLagResult:
+    stale: list[tuple[str, int, int]]  # (series, days behind, limit)
+    unconfigured: list[str]
+
+    @property
+    def ok(self) -> bool:
+        return not self.stale and not self.unconfigured
+
+
+def stale_sources(latest_by_series: dict[str, str], today: str, cfg: dict) -> SourceLagResult:
+    """Which fetched series are further behind than their own publication
+    cadence allows — the guard that stops a fresh run date from vouching for a
+    series FRED has stopped updating."""
+    cadence = get(cfg, "macro_staleness.source_cadence") or {}
+    limits = get(cfg, "macro_staleness.max_source_lag_days") or {}
+    stale, unconfigured = [], []
+    for series, latest in sorted(latest_by_series.items()):
+        if series not in cadence:
+            unconfigured.append(series)
+            continue
+        limit = limits[cadence[series]]
+        days = (_date.fromisoformat(today) - _date.fromisoformat(latest)).days
+        if days > limit:
+            stale.append((series, days, limit))
+    return SourceLagResult(stale, unconfigured)
 
 
 # ------------------------------------- daily replay for gates 1 & 2 (ADR 0017) ---

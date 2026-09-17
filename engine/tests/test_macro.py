@@ -22,6 +22,8 @@ from engine.macro import (
     credit_stress_daily,
     equity_deleveraging_escalated,
     inflation_shock_daily,
+    macro_staleness,
+    stale_sources,
     percentile_rank,
     spx_pct_vs_200dma,
     step_hard_gate,
@@ -391,6 +393,44 @@ class CreditProxyTests(unittest.TestCase):
         r = credit_proxy_check(credit, hedge, CFG)
         self.assertTrue(r.available)
         self.assertEqual(r.as_of, credit[-1][0])
+
+
+class MacroStalenessTests(unittest.TestCase):
+    def test_bands(self):
+        self.assertEqual(macro_staleness("2026-09-14", "2026-09-21", CFG).band, "current")  # 7
+        self.assertEqual(macro_staleness("2026-09-14", "2026-09-22", CFG).band, "flag")     # 8
+        self.assertEqual(macro_staleness("2026-09-14", "2026-09-28", CFG).band, "flag")     # 14
+        self.assertEqual(macro_staleness("2026-09-14", "2026-09-29", CFG).band, "stop")     # 15
+
+    def test_weekly_source_lag_no_longer_reads_as_stale(self):
+        # Regression for 2026-09-17: a 2026-09-14 refresh whose as_of was pinned
+        # to WALCL's 2026-09-09 print flagged "8 calendar days old" and led the
+        # Slack message with it.
+        self.assertEqual(macro_staleness("2026-09-09", "2026-09-17", CFG).band, "flag")
+        run_based = macro_staleness("2026-09-14", "2026-09-17", CFG)
+        self.assertEqual((run_based.days, run_based.band), (3, "current"))
+
+    def test_basis_is_reported_so_output_can_name_the_date(self):
+        self.assertEqual(macro_staleness("2026-09-14", "2026-09-17", CFG).basis, "2026-09-14")
+
+
+class SourceLagTests(unittest.TestCase):
+    def test_normal_sunday_refresh_is_clean(self):
+        r = stale_sources({"DFII10": "2026-09-18", "WALCL": "2026-09-09", "CAPE": "2026-09-01"}, "2026-09-20", CFG)
+        self.assertTrue(r.ok)
+
+    def test_frozen_daily_series_is_caught(self):
+        r = stale_sources({"DFII10": "2026-08-01"}, "2026-09-20", CFG)
+        self.assertEqual(r.stale, [("DFII10", 50, 6)])
+
+    def test_each_series_is_judged_on_its_own_cadence(self):
+        # 10 days behind: fine for weekly WALCL, stale for a daily series.
+        r = stale_sources({"WALCL": "2026-09-10", "DGS10": "2026-09-10"}, "2026-09-20", CFG)
+        self.assertEqual([s for s, _, _ in r.stale], ["DGS10"])
+
+    def test_unconfigured_series_are_reported_not_silently_passed(self):
+        r = stale_sources({"NEWSERIES": "2026-09-19"}, "2026-09-20", CFG)
+        self.assertEqual((r.stale, r.unconfigured, r.ok), ([], ["NEWSERIES"], False))
 
 
 if __name__ == "__main__":

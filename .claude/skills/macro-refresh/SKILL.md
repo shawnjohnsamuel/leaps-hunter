@@ -74,6 +74,18 @@ Leave the `hard_gates.equity_deleveraging` **and `breadth`** blocks exactly as y
 `daily-screen` owns both (ADRs 0015, 0016) — and preserve every other key you did not compute
 rather than rewriting the file wholesale.
 
+### 1a. Source freshness (ADR 0018)
+
+Collect the latest observation date of every series you fetched (FRED ids plus `CAPE`) and call
+`engine.macro.stale_sources(latest_by_series, today, cfg)`. It judges each series against its own
+publication cadence, so a weekly WALCL print being 5 days old is fine while a daily series 10 days
+behind is not.
+
+Record the result in `macro-latest.json` and report it. Anything in `.stale` means a source has
+gone quiet and the values derived from it can't be trusted just because this run is recent —
+say so prominently rather than writing a clean-looking file. Anything in `.unconfigured` means a
+series has no cadence entry in config: add one rather than letting it go unchecked.
+
 ### 1b. NYSE breadth universe refresh
 
 `daily-screen` computes breadth over `state/nyse-constituents.json`, but it can't rebuild that
@@ -89,6 +101,12 @@ likely to mean a truncated page or an API change than 90 real delistings in a we
 a handful of names. If Massive is unreachable, leave the existing file as it is and say so;
 membership moves slowly, so a list that's a few weeks old barely changes the breadth reading.
 
+**Always run this step; never skip it because the list "looks fresh."** It is two or three Massive
+calls. Skipping it also skips the sanity check, and it is the only step that exercises the Massive
+tools — a run on 2026-09-14 skipped it as a same-day judgment call, which meant the tool approval
+an unattended run depends on was never granted. Re-fetching a list that turns out unchanged is the
+cheap outcome; silently not checking is the expensive one.
+
 ### 2. NTM estimate-revision refresh (§10 patterns 2 & 3)
 
 For every name in `state/watchlist.json` (active or not — refreshing a dormant name's NTM is
@@ -97,11 +115,20 @@ cheap and keeps `weekly-review`'s cloud run from ever needing this data mid-week
 apart (Alpha Vantage throttles aggressively — confirmed empirically). Store the resulting
 `NTMResult` (or its `reason` if unavailable) in each entry's `ntm` field.
 
-### 3. Commit and push
+### 3. Write, commit and push
 
-`git add -A && git commit -m "macro-refresh YYYY-MM-DD: <one-line summary>" && git push` in the
-data repo. Use the same commit-message discipline as every other skill in this project — explain
-what changed and why a number moved, not just which files changed.
+Set two dates in `macro-latest.json`, and keep them distinct (ADR 0018):
+
+- **`last_refreshed`** — today, the date this run actually fetched. `daily-screen`'s staleness
+  bands measure from this. Write it on every run that completed step 1, including one where
+  nothing moved: "nothing changed" is still a refresh.
+- **`as_of`** — the most recent data date common to the fetched series. Informational, and
+  legitimately several days behind `last_refreshed` because WALCL is weekly. Never use it as the
+  staleness basis.
+
+Then `git add -A && git commit -m "macro-refresh YYYY-MM-DD: <one-line summary>" && git push` in
+the data repo. Use the same commit-message discipline as every other skill in this project —
+explain what changed and why a number moved, not just which files changed.
 
 ## What stays in `weekly-review` (cloud-compatible)
 
