@@ -10,6 +10,16 @@ Each source splits a thin `fetch_*` (network I/O) from a pure `_parse_*` or
 against recorded fixtures without touching the network — Alpha Vantage in
 particular rate-limits aggressively (throttled after two rapid requests,
 observed 2026-09-03).
+
+`_get` sends no custom `User-Agent` by default — just urllib's own
+identifying string — rather than impersonating a browser. ADR 0019:
+fred.stlouisfed.org started dropping/hanging connections that carried this
+module's old custom UA string on 2026-09-21, while the identical request
+with no custom UA succeeded in well under a second. multpl.com and Alpha
+Vantage have not been observed to need a particular UA either way, so they
+get the same no-custom-UA default for consistency. SEC EDGAR is the one
+exception — its own access policy requires a descriptive, identifying UA
+and 403s without one, so `fetch_sec_company_concept` still sends one.
 """
 from __future__ import annotations
 
@@ -17,19 +27,36 @@ import csv
 import io
 import json
 import re
+import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import date
 from html import unescape
 
-_UA = {"User-Agent": "leaps-hunter/1.0 (research; contact via repo owner)"}
-_TIMEOUT = 30
+_UA: dict[str, str] = {}
+_SEC_UA = {"User-Agent": "leaps-hunter/1.0 (research; contact via repo owner)"}
+_TIMEOUT = 15
+_RETRIES = 2
+_RETRY_DELAY = 2.0
 
 
-def _get(url: str) -> str:
-    req = urllib.request.Request(url, headers=_UA)
-    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-        return resp.read().decode("utf-8", "replace")
+def _get(url: str, headers: dict[str, str] | None = None) -> str:
+    """GET url and decode the body as UTF-8, retrying once after a transient
+    timeout/connection error before raising. `headers` defaults to `_UA`
+    (no custom User-Agent); pass `_SEC_UA` for SEC EDGAR."""
+    req_headers = _UA if headers is None else headers
+    last_exc: Exception = TimeoutError(f"no attempts made for {url!r}")
+    for attempt in range(_RETRIES):
+        try:
+            req = urllib.request.Request(url, headers=req_headers)
+            with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+                return resp.read().decode("utf-8", "replace")
+        except (TimeoutError, urllib.error.URLError) as exc:
+            last_exc = exc
+            if attempt < _RETRIES - 1:
+                time.sleep(_RETRY_DELAY)
+    raise last_exc
 
 
 # ---------------------------------------------------------------- FRED -----
@@ -199,4 +226,4 @@ def fetch_sec_company_concept(cik10: str, taxonomy: str, tag: str) -> dict:
     SEC requires a descriptive User-Agent identifying the requester; feeds
     §8's retention/RPO checks and §11's fundamentals once §8 is built."""
     url = f"https://data.sec.gov/api/xbrl/companyconcept/CIK{cik10}/{taxonomy}/{tag}.json"
-    return json.loads(_get(url))
+    return json.loads(_get(url, headers=_SEC_UA))

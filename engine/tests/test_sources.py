@@ -1,10 +1,19 @@
 """Sources' pure parsing/computation functions, tested against fixtures
 captured from real responses — never against the live network (Alpha
-Vantage in particular throttled after two rapid requests on 2026-09-03)."""
+Vantage in particular throttled after two rapid requests on 2026-09-03).
+
+`_get`'s header/retry behavior is likewise tested against a stubbed
+`urllib.request.urlopen`, never the live network."""
+import io
 import unittest
+import urllib.error
 from datetime import date
+from unittest import mock
 
 from engine.sources import (
+    _SEC_UA,
+    _UA,
+    _get,
     _parse_fred_csv,
     _parse_multpl_cape,
     compute_ntm_eps_revision,
@@ -139,6 +148,48 @@ class RobinhoodDailyClosesTests(unittest.TestCase):
 
     def test_malformed_payload_yields_nothing(self):
         self.assertEqual(parse_robinhood_daily_closes({}), {})
+
+
+def _fake_response(body: bytes):
+    resp = mock.MagicMock()
+    resp.read.return_value = body
+    resp.__enter__.return_value = resp
+    resp.__exit__.return_value = False
+    return resp
+
+
+class GetHeaderAndRetryTests(unittest.TestCase):
+    # ADR 0019: FRED started dropping/hanging connections that carried a
+    # custom User-Agent on 2026-09-21; _get must default to none.
+    def test_no_custom_user_agent_by_default(self):
+        self.assertEqual(_UA, {})
+
+    def test_default_call_sends_no_user_agent_header(self):
+        with mock.patch("engine.sources.urllib.request.urlopen", return_value=_fake_response(b"ok")) as m:
+            _get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=X")
+        sent_req = m.call_args[0][0]
+        self.assertEqual(sent_req.headers, {})
+
+    def test_sec_headers_are_still_sent_when_requested(self):
+        with mock.patch("engine.sources.urllib.request.urlopen", return_value=_fake_response(b"{}")) as m:
+            _get("https://data.sec.gov/api/xbrl/companyconcept/x.json", headers=_SEC_UA)
+        sent_req = m.call_args[0][0]
+        self.assertEqual(sent_req.get_header("User-agent"), _SEC_UA["User-Agent"])
+
+    def test_retries_once_after_a_timeout_then_succeeds(self):
+        with mock.patch(
+            "engine.sources.urllib.request.urlopen",
+            side_effect=[TimeoutError("timed out"), _fake_response(b"recovered")],
+        ), mock.patch("engine.sources.time.sleep"):
+            self.assertEqual(_get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=X"), "recovered")
+
+    def test_raises_after_exhausting_retries(self):
+        with mock.patch(
+            "engine.sources.urllib.request.urlopen",
+            side_effect=urllib.error.URLError("connection refused"),
+        ), mock.patch("engine.sources.time.sleep"):
+            with self.assertRaises(urllib.error.URLError):
+                _get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=X")
 
 
 if __name__ == "__main__":
