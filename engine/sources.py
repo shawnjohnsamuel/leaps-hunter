@@ -22,12 +22,18 @@ from dataclasses import dataclass
 from datetime import date
 from html import unescape
 
+# Headers are per source, not global. SEC EDGAR requires a descriptive
+# User-Agent and rejects anonymous clients; FRED went the other way on
+# 2026-09-21 and began dropping connections that send this one (read timeout,
+# reproducible with curl; the stock urllib User-Agent answers in under a
+# second). So FRED sends no custom header and everyone else keeps it.
 _UA = {"User-Agent": "leaps-hunter/1.0 (research; contact via repo owner)"}
+_NO_UA: dict[str, str] = {}
 _TIMEOUT = 30
 
 
-def _get(url: str) -> str:
-    req = urllib.request.Request(url, headers=_UA)
+def _get(url: str, headers: dict[str, str] = _UA) -> str:
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
         return resp.read().decode("utf-8", "replace")
 
@@ -46,7 +52,7 @@ def fetch_fred_series(series_id: str) -> list[tuple[str, float]]:
     2026-09-03: the keyed JSON endpoint returns the same 795 observations
     as this anonymous CSV)."""
     url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}&cosd=1900-01-01"
-    return _parse_fred_csv(_get(url))
+    return _parse_fred_csv(_get(url, headers=_NO_UA))
 
 
 # -------------------------------------------------------- Shiller CAPE -----

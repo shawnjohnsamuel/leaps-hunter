@@ -1,13 +1,17 @@
 """Sources' pure parsing/computation functions, tested against fixtures
 captured from real responses — never against the live network (Alpha
 Vantage in particular throttled after two rapid requests on 2026-09-03)."""
+import io
 import unittest
 from datetime import date
+from unittest import mock
 
 from engine.sources import (
     _parse_fred_csv,
     _parse_multpl_cape,
     compute_ntm_eps_revision,
+    fetch_fred_series,
+    fetch_sec_company_concept,
     parse_robinhood_daily_closes,
 )
 
@@ -139,6 +143,38 @@ class RobinhoodDailyClosesTests(unittest.TestCase):
 
     def test_malformed_payload_yields_nothing(self):
         self.assertEqual(parse_robinhood_daily_closes({}), {})
+
+
+class _FakeResponse(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class RequestHeaderTests(unittest.TestCase):
+    """Headers are per source. FRED began dropping connections that carry the
+    custom User-Agent on 2026-09-21; SEC EDGAR rejects requests without one."""
+
+    def _capture(self, body: bytes, call):
+        sent = []
+
+        def fake_urlopen(req, timeout):
+            sent.append(req)
+            return _FakeResponse(body)
+
+        with mock.patch("engine.sources.urllib.request.urlopen", fake_urlopen):
+            call()
+        return sent[0]
+
+    def test_fred_sends_no_custom_user_agent(self):
+        req = self._capture(FRED_FIXTURE.encode(), lambda: fetch_fred_series("BAMLH0A0HYM2"))
+        self.assertIsNone(req.get_header("User-agent"))
+
+    def test_sec_keeps_its_descriptive_user_agent(self):
+        req = self._capture(b"{}", lambda: fetch_sec_company_concept("0001108524", "us-gaap", "Revenues"))
+        self.assertIn("leaps-hunter", req.get_header("User-agent"))
 
 
 if __name__ == "__main__":
