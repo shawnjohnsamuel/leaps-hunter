@@ -19,7 +19,7 @@ import json
 import re
 import urllib.request
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from html import unescape
 
 # Headers are per source, not global. SEC EDGAR requires a descriptive
@@ -57,6 +57,18 @@ def fetch_fred_series(series_id: str) -> list[tuple[str, float]]:
 
 # -------------------------------------------------------- Shiller CAPE -----
 
+def _multpl_date_to_iso(cell: str) -> str | None:
+    """multpl.com prints display dates ("Sep 2, 2026"); every other series in
+    this module is ISO. Returns None when the cell is not a date at all, which
+    is also how the value/header columns get skipped — the parse is both the
+    filter and the conversion, so nothing can pass the filter and then fail to
+    convert."""
+    try:
+        return datetime.strptime(cell, "%b %d, %Y").date().isoformat()
+    except ValueError:
+        return None
+
+
 def _parse_multpl_cape(html: str) -> list[tuple[str, float]]:
     m = re.search(r"<table.*?</table>", html, re.S)
     if not m:
@@ -65,22 +77,28 @@ def _parse_multpl_cape(html: str) -> list[tuple[str, float]]:
         unescape(re.sub(r"<[^>]+>", "", c)).strip()
         for c in re.findall(r"<td[^>]*>(.*?)</td>", m.group(0), re.S)
     ]
-    pairs = [
-        (cells[i], cells[i + 1])
-        for i in range(0, len(cells) - 1, 2)
-        if re.match(r"^[A-Z][a-z]{2} \d", cells[i])
-    ]
     out = []
-    for d, v in pairs:
-        num = re.sub(r"[^\d.]", "", v)
+    for i in range(0, len(cells) - 1, 2):
+        iso = _multpl_date_to_iso(cells[i])
+        if iso is None:
+            continue
+        num = re.sub(r"[^\d.]", "", cells[i + 1])
         if num:
-            out.append((d, float(num)))
-    return out
+            out.append((iso, float(num)))
+    return sorted(out)
 
 
 def fetch_cape_series() -> list[tuple[str, float]]:
-    """(date, CAPE) pairs, newest first — multpl.com's own order, Shiller
-    series back to 1871. Feeds §6.2's cape_gt_95pct percentile component."""
+    """(date, CAPE) pairs, ISO dates oldest first, Shiller series back to 1871.
+    Feeds §6.2's cape_gt_95pct percentile component.
+
+    multpl.com serves display dates ("Sep 2, 2026") newest first; this
+    normalises both to match `fetch_fred_series` so every macro series a
+    caller holds has one shape. ADR 0018's `engine.macro.stale_sources` takes
+    ISO dates, so the CAPE row used to need an ad-hoc conversion at the call
+    site — the 2026-09-21 refresh did it in a scratch script. `series[-1][0]`
+    is now the latest observation date here exactly as it is for FRED.
+    """
     return _parse_multpl_cape(_get("https://www.multpl.com/shiller-pe/table/by-month"))
 
 

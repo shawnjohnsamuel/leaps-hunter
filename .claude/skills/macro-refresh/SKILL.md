@@ -81,6 +81,12 @@ Collect the latest observation date of every series you fetched (FRED ids plus `
 publication cadence, so a weekly WALCL print being 5 days old is fine while a daily series 10 days
 behind is not.
 
+Every `engine.sources` series — `fetch_fred_series` and `fetch_cape_series` alike — is
+`(ISO date, value)` oldest first, so the latest observation date is `series[-1][0]` in all of
+them. Pass those straight in. **Do not convert a date in a scratch script**: `fetch_cape_series`
+normalised multpl.com's display order and format on 2026-09-21 precisely so this step stops
+re-deriving it, and a hand conversion is how a wrong date reaches `stale_sources` unnoticed.
+
 Record the result in `macro-latest.json` and report it. Anything in `.stale` means a source has
 gone quiet and the values derived from it can't be trusted just because this run is recent —
 say so prominently rather than writing a clean-looking file. Anything in `.unconfigured` means a

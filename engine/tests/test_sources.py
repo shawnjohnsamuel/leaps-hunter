@@ -7,6 +7,8 @@ import unittest
 from datetime import date
 from unittest import mock
 
+from engine.config import TEMPLATE_PATH, load_config
+from engine.macro import stale_sources
 from engine.sources import (
     _parse_fred_csv,
     _parse_multpl_cape,
@@ -24,6 +26,8 @@ FRED_FIXTURE = (
     "2026-09-02,2.66\n"
 )
 
+# multpl.com's own shape, kept verbatim so the parser is tested against what
+# the site actually serves: display dates, newest first, months not contiguous.
 MULTPL_FIXTURE = (
     "<html><body><table id='datatable'>"
     "<tr><td>Sep 2, 2026</td><td>41.93</td>"
@@ -86,11 +90,41 @@ class FredParsingTests(unittest.TestCase):
 
 
 class MultplCapeParsingTests(unittest.TestCase):
-    def test_extracts_date_value_pairs(self):
+    def test_dates_are_iso_and_rows_are_oldest_first(self):
+        # multpl serves "Sep 2, 2026" newest first; the parser normalises both
+        # so a CAPE series is shaped exactly like a FRED one and `[-1]` is the
+        # latest observation in either.
         rows = _parse_multpl_cape(MULTPL_FIXTURE)
         self.assertEqual(
-            rows, [("Sep 2, 2026", 41.93), ("Jul 1, 2026", 40.73), ("Jun 1, 2026", 40.50)]
+            rows, [("2026-06-01", 40.50), ("2026-07-01", 40.73), ("2026-09-02", 41.93)]
         )
+
+    def test_non_date_cells_are_skipped_not_emitted(self):
+        html = (
+            "<html><body><table>"
+            "<tr><td>Shiller PE</td><td>Value</td>"
+            "<td>Sep 2, 2026</td><td>41.93</td></tr>"
+            "</table></body></html>"
+        )
+        self.assertEqual(_parse_multpl_cape(html), [("2026-09-02", 41.93)])
+
+    def test_latest_date_feeds_stale_sources_without_conversion(self):
+        # The point of the ISO change (ADR 0018): the CAPE row goes straight
+        # into stale_sources alongside the FRED ids. Converting it ad hoc in a
+        # scratch script, as the 2026-09-21 refresh had to, is the failure mode
+        # this pins shut.
+        cape = _parse_multpl_cape(MULTPL_FIXTURE)
+        fred = _parse_fred_csv(FRED_FIXTURE)
+        latest_by_series = {"CAPE": cape[-1][0], "BAMLH0A0HYM2": fred[-1][0]}
+        self.assertEqual(latest_by_series, {"CAPE": "2026-09-02", "BAMLH0A0HYM2": "2026-09-02"})
+
+        cfg = load_config(TEMPLATE_PATH)
+        self.assertTrue(stale_sources(latest_by_series, "2026-09-08", cfg).ok)
+        # 18 days on, each judged on its own cadence: past the daily series'
+        # 6-day limit, still well inside CAPE's monthly 45.
+        r = stale_sources(latest_by_series, "2026-09-20", cfg)
+        self.assertEqual([s for s, _, _ in r.stale], ["BAMLH0A0HYM2"])
+        self.assertEqual(r.unconfigured, [])
 
 
 class NtmEpsRevisionTests(unittest.TestCase):
