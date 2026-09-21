@@ -107,7 +107,19 @@ def fetch_av_earnings_estimates(symbol: str, api_key: str) -> dict:
         "https://www.alphavantage.co/query?function=EARNINGS_ESTIMATES"
         f"&symbol={symbol}&apikey={api_key}"
     )
-    return json.loads(_get(url))
+    return _redact_key(json.loads(_get(url)), api_key)
+
+
+def _redact_key(payload: dict, api_key: str) -> dict:
+    """Alpha Vantage's rate-limit notice quotes the caller's key back ("We have
+    detected your API key as ..."), so a run that printed the payload leaked it
+    into its transcript on 2026-09-21. Scrub it before anything can print it."""
+    if not api_key:
+        return payload
+    return {
+        k: v.replace(api_key, "[redacted]") if isinstance(v, str) else v
+        for k, v in payload.items()
+    }
 
 
 def compute_ntm_eps_revision(payload: dict, as_of: date) -> NTMResult:
