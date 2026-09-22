@@ -1,0 +1,89 @@
+# stock-screen's thresholds and weights (ADR 0019). Every number the
+# `stock-screen` skill applies lives here, never as a literal in
+# engine/vehicle.py. The one exception is by design: the LEAP row reads v7's
+# own config (option_vetoes.dte_range, quoted_spread_max_pct,
+# open_interest_min, delta_policy, restricted_regime kelly multipliers), so
+# stock-screen can never call a LEAP permissible that v7 would not.
+#
+# Every default below is an [ASSUMPTION], not a calibrated value. None of
+# them has an out-of-sample record yet; tune them deliberately and note why.
+version: 1
+
+# Name-level hard disqualifiers. Failing any one stops the screen for that
+# ticker: nothing is scored.
+disqualifiers:
+  min_avg_daily_dollar_volume: 5000000    # shares must be tradable without moving the price
+  min_cash_runway_months: 12              # applies only when free cash flow is negative and funding isn't secured
+  max_share_growth_yoy_pct: 10
+  dilution_growth_offset_multiple: 2.0    # dilution above the max passes only if revenue grows >= this multiple of it
+  # ...and only from a real base. QUBT (2026-09-21) diluted 58.9% and
+  # "justified" it with +9,000% revenue from a $61K quarter, mostly acquired.
+  dilution_offset_min_prior_quarter_revenue_usd: 25000000
+  etf_min_aum_usd: 100000000
+  etf_max_expense_ratio_pct: 1.0
+
+factors:
+  # Contrarian rule, enforced mechanically: an extended chart can't score
+  # well on technical_setup however the model reads it.
+  extension_cap:
+    rsi14_at_or_above: 75
+    pct_above_50dma_at_or_above: 20
+    capped_score: 3
+  # volatility_pricing is computed, never judged. IV rank maps linearly
+  # (0 -> 10, 100 -> 0). Without IV rank, ATM IV / 30-day realized vol maps
+  # linearly from 10 at the cheap ratio to 0 at the rich one.
+  volatility_pricing:
+    iv_hv_cheap_at_or_below: 0.9
+    iv_hv_rich_at_or_above: 1.5
+    expensive_at_or_below_score: 5        # IV rank >= 50, or IV/HV >= 1.2
+    # Drop the single largest daily move from HV30. Right after earnings the
+    # gap day inflates realized vol and makes options look cheap (MDB and
+    # NVDA, 2026-09-21). Trimming errs toward "options aren't cheap", which
+    # is the safe direction for a buyer.
+    hv_trim_largest_moves: 1
+
+# Per-vehicle factor weights, each set summing to 1.0. `iv_richness` is
+# 10 - volatility_pricing: a put seller wants expensive options.
+weights:
+  shares:     {fundamental_quality: 0.25, valuation_dislocation: 0.25, catalyst_strength: 0.10, downside_survivability: 0.25, technical_setup: 0.05, sentiment_positioning: 0.10, volatility_pricing: 0.00}
+  short_call: {fundamental_quality: 0.05, valuation_dislocation: 0.05, catalyst_strength: 0.30, downside_survivability: 0.05, technical_setup: 0.25, sentiment_positioning: 0.10, volatility_pricing: 0.20}
+  csp:        {fundamental_quality: 0.20, valuation_dislocation: 0.15, catalyst_strength: 0.05, downside_survivability: 0.25, technical_setup: 0.10, sentiment_positioning: 0.05, iv_richness: 0.20}
+  leap:       {fundamental_quality: 0.15, valuation_dislocation: 0.25, catalyst_strength: 0.20, downside_survivability: 0.20, technical_setup: 0.05, sentiment_positioning: 0.05, volatility_pricing: 0.10}
+
+vehicles:
+  shares:
+    earnings_warning_days: 14
+  short_call:
+    dte_range: [30, 90]
+    delta_range: [0.60, 0.85]             # ITM-first
+    leverage_delta_min: 0.30              # only when the user explicitly asks for leverage; labeled LEVERAGE
+    quoted_spread_max_pct: 5
+    open_interest_min: 250
+    iv_crush_penalty: 15                  # earnings inside the expiry while options are expensive
+    no_catalyst_penalty: 15               # nothing dated inside the expiry to move the stock
+  csp:
+    # Robinhood lists cash-secured puts under Level 2 (basic strategies);
+    # Level 3 adds spreads. The account's option_level comes from get_accounts.
+    permitted_option_levels: [option_level_2, option_level_3]
+    dte_range: [21, 60]
+    put_delta_range: [0.15, 0.35]
+    quoted_spread_max_pct: 5
+    open_interest_min: 250
+  # leap: no block. The LEAP row reads v7's config; see the header.
+
+confidence:
+  high_max_gap: 5     # score ceiling minus floor, in points
+  med_max_gap: 15
+
+verdict:
+  pass_below: 60
+  # Ties lean toward upside, but never onto the vehicle most likely to
+  # expire worthless within weeks; puts last, since their upside is capped
+  # at the premium. The user's choice, 2026-09-21.
+  tie_break_order: [leap, shares, short_call, csp]
+
+sizing:
+  # Maximum loss per position as % of total NAV. Defaults equal v7's
+  # unvalidated-setup cap (§14/§17): stock-screen has no calibration record
+  # either. LEAPs are never sized here; v7 owns that.
+  max_loss_pct_nav: {shares: 0.25, short_call: 0.25, csp: 0.25}
