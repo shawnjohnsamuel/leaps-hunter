@@ -1,0 +1,83 @@
+{
+  "skill_name": "stock-screen",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "MDB has pulled back a lot since mid-August. quick take \u2014 is it better as shares, a short-dated call, or a LEAP right now?",
+      "expected_output": "One-screen quick mode for MDB: verdict line with best-fit vehicle, composite (floor and ceiling) and confidence; a decision matrix covering shares, short call, cash-secured put and LEAP with live contracts; LEAP row labeled as on the v7 watchlist and pointed to bench-check, with a delta inside v7's restricted band; 3 reasons for and against tagged [FACT]/[ASSUMPTION]; what-would-change-my-mind triggers; a deep-dive offer.",
+      "files": [],
+      "expectations": [
+        "Opens with a verdict line naming MDB, a best-fit vehicle or PASS, a numeric composite score, and a confidence level",
+        "Decision matrix covers all four vehicles: shares, short-dated call, cash-secured put, LEAP",
+        "Every option row names a specific expiry, strike and delta",
+        "LEAP row says MDB is on the v7 watchlist and points to bench-check for v7's verdict and size",
+        "LEAP contract delta is inside v7's restricted-regime band (0.70-0.85)",
+        "No LEAP position size (contract count or % of NAV) is recommended",
+        "Reasons for and against carry [FACT]/[ASSUMPTION] tags",
+        "Has a what-would-change-my-mind section with at least one observable trigger (price level, date or data point)",
+        "screen_output.json exists and its MDB composite equals the composite in the report",
+        "Says quotes are from a closed market (not live)",
+        "Verdict line gives the full company name (MongoDB) next to the ticker",
+        "Report follows the flow: where it stands, then the vehicles, then how to play it"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "thinking about TQQQ \u2014 would you do jan 2028 leaps on it or just hold the shares for a year? tech feels like it has another leg up",
+      "expected_output": "TQQQ is DISQUALIFIED as a leveraged daily-reset ETF, named as the failing check with the reason; no vehicle is scored.",
+      "files": [],
+      "expectations": [
+        "Verdict is DISQUALIFIED (or an explicit reject) citing leverage / daily-reset decay",
+        "No composite or vehicle scores are given for TQQQ",
+        "Does not propose a specific TQQQ LEAP strike or share position size",
+        "screen_output.json shows TQQQ disqualified on the leveraged_or_inverse check",
+        "The reply stays short (about 10 lines or fewer after the header) and prices no options",
+        "The run used 15 or fewer tool calls"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "rank these for me by how good the setup is and tell me the best way to play each: NVDA, CEG, PLTR, XLE",
+      "expected_output": "A single ranked table (ticker, composite, best vehicle, confidence, top risk) in engine order, XLE treated as an ETF, then one verdict line per name; no full per-name matrices.",
+      "files": [],
+      "expectations": [
+        "One ranked table lists NVDA, CEG, PLTR and XLE with composite, best vehicle, confidence and top risk",
+        "Table order is descending by composite, with any disqualified names last",
+        "XLE is treated as an ETF, not run through company-only checks (dilution, cash runway)",
+        "Gives one verdict line per name",
+        "Does not include full per-name decision matrices",
+        "Any LEAP best-fit is labeled unsized / on-watchlist (bench-check) rather than sized",
+        "Report ranking order matches screen_output.json",
+        "The ranked table gives each ticker's company or fund name"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "PLTR has been on a tear. thinking about grabbing some short-dated calls to ride it \u2014 good idea or is there a better way?",
+      "expected_output": "Quick mode for Palantir with all four vehicles scored from live data. The report shows whether the chart is extended (RSI, distance above the 50-day) and whether that capped technical_setup, whether options are expensive against realized vol, and whether earnings fall inside the short call's expiry. If the short call isn't the best fit, it says why in terms of the scores.",
+      "files": [],
+      "expectations": [
+        "Verdict line gives the company name, a best-fit vehicle or PASS/INCOMPLETE, a composite and a confidence level",
+        "Reports RSI14 and distance above the 50-day average, and says whether the extension cap applied",
+        "Says whether options are cheap or expensive against realized volatility",
+        "Says whether earnings fall inside the short call's expiry",
+        "Answers the user's short-call question directly, in terms of the scores",
+        "Every option row names a specific expiry, strike and delta",
+        "Report follows the flow: where it stands, then the vehicles, then how to play it"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "QUBT keeps getting hyped with all the quantum stuff. would a cheap jan 2028 leap make sense as a lotto ticket?",
+      "expected_output": "The name-level checks run first from filings: share-count growth, revenue growth, cash runway, integrity. If one fails, the reply is a short DISQUALIFIED with the figures and no option pricing. If none fails, the dilution result is explained with its numbers. No sub-0.55-delta LEAP is proposed as a lotto ticket.",
+      "files": [],
+      "expectations": [
+        "Reports share-count growth YoY and revenue growth YoY with figures from filings",
+        "Reports the cash-runway / free-cash-flow check with figures",
+        "If any disqualifier fails, the verdict is DISQUALIFIED and no options are priced",
+        "Does not propose a LEAP below 0.55 delta, and explains that v7 prohibits one",
+        "Gives the company's full name"
+      ]
+    }
+  ]
+}

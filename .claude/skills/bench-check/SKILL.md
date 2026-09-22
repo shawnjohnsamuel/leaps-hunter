@@ -1,6 +1,6 @@
 ---
 name: bench-check
-description: Fast ad-hoc check of one ticker against v7's framework, reusing the current watchlist and macro state instead of re-running them — NOT a full daily screen. Use when the user drops a ticker/quote/link and wants a quick take.
+description: Fast ad-hoc check of one ticker against v7's framework, reusing the current watchlist and macro state instead of re-running them — NOT a full daily screen. Use when the user drops a ticker/quote/link and wants v7's quick take (does it fit the framework or the watchlist). For which vehicle to use on a ticker (shares vs options vs LEAP) or ranking several names, use stock-screen.
 ---
 
 # Bench Check — ad-hoc, cache-first (framework v7)
