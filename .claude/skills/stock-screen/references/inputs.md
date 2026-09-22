@@ -5,7 +5,7 @@ fails loudly instead of being silently ignored. Every value you couldn't establi
 
 ## Contents
 - Full example
-- Field sources: context, name (stocks), name (ETFs), market, dates, contracts
+- Field sources: context, name (stocks), name (ETFs), name (closed-end funds), market, dates, contracts
 - The `technicals` helper
 
 ## Full example
@@ -95,13 +95,35 @@ from `{"closes": [], "last_close": ..., "avg_volume": ...}` if you'd rather not 
 | `expense_ratio_pct` | Issuer page via web search. Use the **net** ratio (after any fee waiver), since that's what holders pay. `null` if not found. |
 | `avg_daily_dollar_volume` | `technicals` helper. |
 
+### name — closed-end funds (`instrument_type: "cef"`)
+The fund-level risk a closed-end fund adds is its price drifting away from its holdings. The engine
+turns these fields into a premium or discount to NAV and checks how old that NAV is.
+
+| Field | Source |
+|---|---|
+| `last_price` | The official last close from `get_equity_quotes`. |
+| `nav_per_share` | The fund's latest published NAV: its own site, CEFConnect, or the latest N-CSR / N-PORT / 10-Q. Say which. |
+| `nav_age_days` | Today minus the NAV's as-of date, in calendar days. Daily-NAV funds read 1–3; funds holding private assets strike quarterly and can read ~90. Past the cap (config: 100) the premium can't be trusted, and the check fails closed. |
+| `aum_usd` | Net assets: `nav_per_share` × `shares_outstanding` from `get_equity_fundamentals`. Never market cap. |
+| `expense_ratio_pct` | Total annual expenses as a % of net assets, from the latest annual report. Leave out interest expense if it's reported separately (the cost of leverage isn't a fee). If you can only confirm the management fee, use it: it's a floor on the total. Say which you used. |
+| `integrity_red_flag` | The stock rule, applied to the fund and its adviser, plus any auditor or regulator challenge to how the fund values its holdings. |
+| `avg_daily_dollar_volume` | `technicals` helper. |
+
+Example (DXYZ, 2026-09-22, disqualified on expenses: 2.50% fee alone vs a 2.0% cap):
+
+```json
+{"ticker": "DXYZ", "instrument_type": "cef",
+ "name": {"avg_daily_dollar_volume": 29219502, "aum_usd": 1044972275, "expense_ratio_pct": 2.5,
+          "last_price": 30.99, "nav_per_share": 34.30, "nav_age_days": 84, "integrity_red_flag": false}}
+```
+
 ### market
 | Field | Source |
 |---|---|
 | `rsi14`, `pct_above_50dma`, `hv30` | `technicals` helper output (`market` block). |
 | `atm_iv` | The call `implied_volatility` at the strike nearest spot, in the monthly expiry closest to 30 DTE (at least 21), so it compares like-for-like with `hv30`. If that strike has zero open interest, use the nearest one that has some. Include it in a quote batch. The short call's IV-crush check uses that contract's own IV, so an expiry spanning earnings is judged on its real price. |
 | `iv_rank` | Only if a source actually reports it. Robinhood doesn't; leave `null` and the engine uses `atm_iv / hv30`. Never estimate it. |
-| `days_to_earnings` | `get_earnings_results` → next report date − today, in calendar days. For an ETF leave it `null`: ETFs don't report, and the engine treats `null` there as no event rather than an unknown one. |
+| `days_to_earnings` | `get_earnings_results` → next report date − today, in calendar days. For an ETF or closed-end fund leave it `null`: funds don't report earnings, and the engine treats `null` there as no event rather than an unknown one. |
 | `days_to_nearest_catalyst` | The nearest **dated** catalyst of any kind: earnings, product launch, investor day, FDA date, index inclusion. From news or web search. `null` if nothing is dated. |
 
 ### catalyst_horizon_days

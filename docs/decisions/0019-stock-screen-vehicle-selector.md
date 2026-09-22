@@ -110,3 +110,17 @@ Three test runs against live data, each paired with a run without the skill, cha
 - **`strike` helper** (`python3 -m engine.vehicle strike`). The rough starting-strike rule put
   MDB's Jan-28 0.76-delta call around $250; the helper gives $335, against $340 quoted.
 
+## Amendment: closed-end funds (2026-09-22)
+
+The first live use after the test rounds screened DXYZ (Destiny Tech100, a closed-end fund holding
+private tech stakes). It went through the ETF checks as the nearest fit and was disqualified on
+expenses, but the check that matters most for a closed-end fund didn't exist. A CEF's price floats
+free of its holdings, and DXYZ has swung from large premiums to a roughly 10% discount.
+
+A third `instrument_type`, `cef`, now has its own name-level checks: net assets (NAV × shares,
+never market cap), an expense cap of 2.0% (CEFs cost more to run than ETFs), a premium to NAV of at
+most 10% (a discount never disqualifies; it's scored as dislocation), a NAV no older than 100 days
+(quarterly private-asset marks are ~90), and the integrity check. Missing NAV, price or NAV date
+fails closed. DXYZ replays as disqualified on expenses alone: its 2.50% management fee, a floor on
+its total, exceeds the cap. All four thresholds are `[ASSUMPTION]`s in `engine/stock_screen.yaml`.
+

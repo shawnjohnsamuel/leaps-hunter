@@ -30,6 +30,10 @@ GOOD_ETF = NameInputs(
     instrument_type="etf", avg_daily_dollar_volume=2e9, leveraged_or_inverse=False,
     aum_usd=5e10, expense_ratio_pct=0.20,
 )
+GOOD_CEF = NameInputs(
+    instrument_type="cef", avg_daily_dollar_volume=4e7, aum_usd=8e8, expense_ratio_pct=1.4,
+    last_price=19.0, nav_per_share=20.0, nav_age_days=1, integrity_red_flag=False,
+)  # a 5% discount, NAV struck yesterday
 JUDGED_ALL = JudgedFactors(8, 8, 7, 8, 6, 6)
 MARKET = MarketInputs(rsi14=40, pct_above_50dma=-8, hv30=0.40, atm_iv=0.42,
                       days_to_earnings=70, days_to_nearest_catalyst=40)
@@ -122,6 +126,45 @@ class NameDisqualifierTests(unittest.TestCase):
     def test_leveraged_etf_fails(self):
         n = replace(GOOD_ETF, leveraged_or_inverse=True)
         self.assertIn("leveraged_or_inverse", failing(name_disqualifiers(CFG, n)))
+
+    def test_clean_cef_passes_and_skips_company_checks(self):
+        checks = name_disqualifiers(CFG, GOOD_CEF)
+        self.assertEqual(failing(checks), set())
+        names = {c.name for c in checks}
+        self.assertTrue({"premium_to_nav", "nav_age", "net_assets", "expense_ratio", "integrity"} <= names)
+        self.assertNotIn("dilution", names)
+        self.assertNotIn("leveraged_or_inverse", names)
+
+    def test_cef_premium_over_the_cap_fails_but_any_discount_passes(self):
+        rich = replace(GOOD_CEF, last_price=25.0)  # 25% premium
+        self.assertIn("premium_to_nav", failing(name_disqualifiers(CFG, rich)))
+        deep = replace(GOOD_CEF, last_price=10.0)  # 50% discount
+        self.assertNotIn("premium_to_nav", failing(name_disqualifiers(CFG, deep)))
+
+    def test_cef_stale_or_missing_nav_fails_closed(self):
+        self.assertIn("nav_age", failing(name_disqualifiers(CFG, replace(GOOD_CEF, nav_age_days=140))))
+        self.assertIn("nav_age", failing(name_disqualifiers(CFG, replace(GOOD_CEF, nav_age_days=None))))
+        self.assertIn("premium_to_nav", failing(name_disqualifiers(CFG, replace(GOOD_CEF, nav_per_share=None))))
+
+    def test_cef_uses_its_own_expense_cap(self):
+        # 1.4% would fail an ETF's 1.0% cap; a CEF's cap is 2.0%.
+        self.assertNotIn("expense_ratio", failing(name_disqualifiers(CFG, GOOD_CEF)))
+        self.assertIn("expense_ratio", failing(name_disqualifiers(CFG, replace(GOOD_CEF, expense_ratio_pct=2.5))))
+
+    def test_dxyz_as_of_2026_09_22_fails_only_on_expenses(self):
+        dxyz = NameInputs(instrument_type="cef", avg_daily_dollar_volume=2.92e7, aum_usd=1.045e9,
+                          expense_ratio_pct=2.5, last_price=30.99, nav_per_share=34.30, nav_age_days=84,
+                          integrity_red_flag=False)
+        checks = name_disqualifiers(CFG, dxyz)
+        self.assertEqual(failing(checks), {"expense_ratio"})
+        prem = next(c for c in checks if c.name == "premium_to_nav")
+        self.assertIn("9.7% discount", prem.reason)
+
+    def test_cef_has_no_earnings_so_no_crush_floor_penalty(self):
+        m = replace(MARKET, days_to_earnings=None, atm_iv=0.56)
+        rich = replace(SHORT_CALL, implied_volatility=0.56)
+        sc = screen(CFG, V7, inputs(name=GOOD_CEF, market=m, short_call=rich), LIVE_RESTRICTED).vehicles["short_call"]
+        self.assertEqual(sc.score_ceiling, sc.score_floor)
 
     def test_unknown_instrument_type_fails(self):
         self.assertEqual(failing(name_disqualifiers(CFG, NameInputs(instrument_type="bond"))),

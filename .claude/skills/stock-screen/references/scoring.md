@@ -20,6 +20,17 @@ A few habits make the scores honest:
 
 For ETFs, apply each anchor to the basket and the structure, as the ETF notes describe.
 
+**Closed-end funds** follow the ETF notes, with four differences:
+- `valuation_dislocation` reads the **discount to NAV against the fund's own history** as well as
+  the holdings' valuation. A discount well wider than its one-year average is a dislocation (7–8).
+  A premium scores 3 or lower, since you'd be paying more than the holdings are worth.
+- `fundamental_quality` includes how verifiable the NAV is. Holdings priced daily in public
+  markets beat quarterly marks on private companies, whatever those companies are.
+- `downside_survivability` weighs structural leverage (borrowing or preferred shares),
+  concentration, and whether the discount can widen further in a selloff. For CEFs it usually can.
+- `catalyst_strength` counts tender offers, buybacks below NAV, a holding's IPO or sale, and
+  activist pressure on the discount. A rights offering is dilutive and works against you.
+
 ---
 
 ## fundamental_quality — growth, margins, balance sheet, cash generation

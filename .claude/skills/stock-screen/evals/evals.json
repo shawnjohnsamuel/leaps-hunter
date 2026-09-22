@@ -78,6 +78,19 @@
         "Does not propose a LEAP below 0.55 delta, and explains that v7 prohibits one",
         "Gives the company's full name"
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "/stock-screen dxyz",
+      "expected_output": "Destiny Tech100 is recognized as a closed-end fund and screened with the CEF checks: premium or discount to NAV with the NAV's date, net assets from NAV (not market cap), expense ratio, integrity. It is DISQUALIFIED on expenses (2.50% management fee alone vs the 2.0% cap), in a short reply that prices no options.",
+      "files": [],
+      "expectations": [
+        "Identifies DXYZ as a closed-end fund (instrument_type cef)",
+        "Reports the premium or discount to NAV with the NAV's as-of date",
+        "Uses net assets from NAV, not market cap",
+        "Verdict is DISQUALIFIED on expense ratio, citing the 2.50% management fee",
+        "Prices no options and stays under about ten lines"
+      ]
     }
   ]
 }

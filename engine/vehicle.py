@@ -80,9 +80,12 @@ class NameInputs:
     passes. `integrity_red_flag` covers fraud allegations, a delisting
     notice, a pending restatement, or an auditor's going-concern doubt.
     `dilution_from_acquisition` is True only when the share-count jump comes
-    from one closed, stock-funded acquisition rather than ongoing issuance."""
+    from one closed, stock-funded acquisition rather than ongoing issuance.
+    For a closed-end fund, `aum_usd` is net assets (NAV x shares), never
+    market cap, and `last_price` / `nav_per_share` / `nav_age_days` give the
+    premium to NAV and how much to trust it."""
 
-    instrument_type: str  # "stock" or "etf"
+    instrument_type: str  # "stock", "etf" or "cef" (closed-end fund)
     avg_daily_dollar_volume: float | None = None
     fcf_positive: bool | None = None
     cash_runway_months: float | None = None
@@ -95,6 +98,9 @@ class NameInputs:
     leveraged_or_inverse: bool | None = None
     aum_usd: float | None = None
     expense_ratio_pct: float | None = None
+    last_price: float | None = None
+    nav_per_share: float | None = None
+    nav_age_days: int | None = None
 
 
 def _dollar_volume_check(cfg: dict, adv: float | None) -> GateCheck:
@@ -157,8 +163,44 @@ def _flag_check(name: str, flag: bool | None, bad: str, good: str) -> GateCheck:
     return GateCheck(name, not flag, bad if flag else good)
 
 
+def premium_to_nav_pct(n: NameInputs) -> float | None:
+    if n.last_price is None or not n.nav_per_share:
+        return None
+    return (n.last_price / n.nav_per_share - 1) * 100
+
+
+def _cef_checks(cfg: dict, n: NameInputs) -> list[GateCheck]:
+    d = get(cfg, "disqualifiers")
+    checks = []
+    min_assets = d["cef_min_net_assets_usd"]
+    checks.append(GateCheck("net_assets", False, "net assets unknown") if n.aum_usd is None else
+                  GateCheck("net_assets", n.aum_usd >= min_assets,
+                            f"${n.aum_usd:,.0f} (min ${min_assets:,.0f})"))
+    er_max = d["cef_max_expense_ratio_pct"]
+    checks.append(GateCheck("expense_ratio", False, "expense ratio unknown") if n.expense_ratio_pct is None else
+                  GateCheck("expense_ratio", n.expense_ratio_pct <= er_max,
+                            f"{n.expense_ratio_pct:.2f}% (max {er_max}% for a closed-end fund)"))
+    max_age = d["cef_max_nav_age_days"]
+    if n.nav_age_days is None:
+        checks.append(GateCheck("nav_age", False, "NAV date unknown"))
+    else:
+        checks.append(GateCheck("nav_age", n.nav_age_days <= max_age,
+                                f"NAV is {n.nav_age_days}d old (max {max_age}d)"))
+    prem = premium_to_nav_pct(n)
+    max_prem = d["cef_max_premium_to_nav_pct"]
+    if prem is None:
+        checks.append(GateCheck("premium_to_nav", False, "price or NAV per share unknown"))
+    else:
+        side = "premium" if prem >= 0 else "discount"
+        checks.append(GateCheck("premium_to_nav", prem <= max_prem,
+                                f"{abs(prem):.1f}% {side} to NAV (max premium {max_prem}%)"))
+    checks.append(_flag_check("integrity", n.integrity_red_flag,
+                              "fraud, regulator action, restatement or valuation-agent flag", "no integrity flags"))
+    return checks
+
+
 def name_disqualifiers(cfg: dict, n: NameInputs) -> list[GateCheck]:
-    if n.instrument_type not in ("stock", "etf"):
+    if n.instrument_type not in ("stock", "etf", "cef"):
         return [GateCheck("instrument_type", False, f"unknown instrument type {n.instrument_type!r}")]
     checks = [_dollar_volume_check(cfg, n.avg_daily_dollar_volume)]
     if n.instrument_type == "stock":
@@ -168,6 +210,8 @@ def name_disqualifiers(cfg: dict, n: NameInputs) -> list[GateCheck]:
             _flag_check("integrity", n.integrity_red_flag,
                         "fraud, delisting, restatement or going-concern flag", "no integrity flags"),
         ]
+    elif n.instrument_type == "cef":
+        checks += _cef_checks(cfg, n)
     else:
         # Daily-reset leverage decays over any holding period this skill
         # screens for (30+ days), so it fails every vehicle, not just some.

@@ -1,11 +1,11 @@
 ---
 name: stock-screen
-description: Screen any stock or ETF, one ticker or a list, and pick the best vehicle for it (shares, a short-dated call, a cash-secured put, or a LEAP), with a deterministic 0-100 score that ranks names against each other, a one-screen decision matrix, and an on-request deep dive with scenarios, expected geometric return and sizing. Use this whenever the user names tickers and asks whether to buy, how to play a name, shares vs options vs LEAPs, "is X a buy", "quick take on X", "compare/rank these", "stock-screen X", or "deep dive X", even if they don't say "screen". Not for v7's own runs: "run the daily screen"/"screen today" belongs to daily-screen, and "does X fit v7 / the watchlist" belongs to bench-check.
+description: Screen any stock, ETF or closed-end fund, one ticker or a list, and pick the best vehicle for it (shares, a short-dated call, a cash-secured put, or a LEAP), with a deterministic 0-100 score that ranks names against each other, a one-screen decision matrix, and an on-request deep dive with scenarios, expected geometric return and sizing. Use this whenever the user names tickers and asks whether to buy, how to play a name, shares vs options vs LEAPs, "is X a buy", "quick take on X", "compare/rank these", "stock-screen X", or "deep dive X", even if they don't say "screen". Not for v7's own runs: "run the daily screen"/"screen today" belongs to daily-screen, and "does X fit v7 / the watchlist" belongs to bench-check.
 ---
 
 # Stock Screen — which vehicle, and how the name ranks
 
-This skill answers a question v7 deliberately doesn't: for **any** stock or ETF, which vehicle fits
+This skill answers a question v7 deliberately doesn't: for **any** stock, ETF or closed-end fund, which vehicle fits
 best — shares, a 30–90 day call, a cash-secured put, or a LEAP — and how does the name rank against
 others. It sits beside the v7 skills rather than competing with them (ADR 0019):
 
@@ -68,12 +68,16 @@ just that block and stop gathering. The engine won't score a disqualified name, 
 chains, the account lookup and judgment calls for it are wasted work. `references/inputs.md`
 shows the minimal file for this case.
 
-- **Stock or ETF?** `get_equity_fundamentals` (profile, 52-week high, average volume, market cap).
-  An ETF's market cap is its AUM.
+- **Stock, ETF or closed-end fund?** `get_equity_fundamentals` (profile, 52-week high, average
+  volume, market cap). An ETF's market cap is its AUM. A profile that says "closed-end management
+  investment company" is a closed-end fund (`instrument_type: "cef"`). Its price floats free of
+  its holdings, so its market cap is *not* its assets: use NAV × shares.
 - **Name-level disqualifiers** (stocks): free cash flow sign and runway, share-count growth YoY
   (and whether a jump came from one stock-funded acquisition), revenue growth YoY, integrity
   flags. Latest 10-Q via `get_sec_filing_index` → `get_sec_filing_facts`, plus `get_financials`.
-  ETFs instead: leveraged/inverse, AUM, expense ratio.
+  ETFs instead: leveraged/inverse, AUM, expense ratio. Closed-end funds: NAV per share and its
+  date (for the premium or discount to NAV, and how stale that is), net assets, expense ratio,
+  integrity.
 - **Technicals:** Robinhood's `get_equity_technical_indicators` with `output: latest` for RSI14,
   SMA50 and SMA200. For 30-day realized vol, pull ~31 sessions with `get_equity_historicals` and
   hand the closes to `python3 -m engine.vehicle technicals <workdir>/tech/<TICKER>.json`, which
