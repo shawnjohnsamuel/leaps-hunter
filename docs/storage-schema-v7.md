@@ -12,6 +12,7 @@ state/config.yaml          the single threshold source (§20), plus portfolio.ac
 state/watchlist.json       Stage A output — mechanism, evidence, kill switches, patterns
 state/macro-latest.json    persisted §6.1 hard-gate state + last §6.2 R computation
 state/calibration.json     the §17 paper-trade ledger
+state/screener-feed.json   screener-feed hit history (ADR 0020), written only by daily-screen
 weekly/YYYY-MM-DD.json     Stage A run record (Phase 5)
 daily/YYYY-MM-DD.json      Stage B run record (Phase 5)
 adhoc/<ticker>-*.json      bench-check run records (Phase 5)
@@ -96,6 +97,48 @@ of whether §13.3 (`engine.sizing.compute_feasibility`) finds it feasible at cur
 the count of realized-outcome entries needed before a mechanism/structure combination graduates
 from the 0.25% unvalidated-setup cap to its full structure-specific cap. An infeasible entry is
 not a wasted screen — it is exactly as valuable to the ledger as a feasible one.
+
+## `state/screener-feed.json`
+
+**Written only by `daily-screen`, only through [`engine.feed.update_feed`](../engine/feed.py)**
+([ADR 0020](decisions/0020-screener-feed-candidate-source.md)). `weekly-review` reads it through
+`engine.feed.promotable` and never writes it. Created by the first run that records a session,
+so it doesn't exist before then.
+
+```json
+{
+  "schema_version": 1,
+  "last_updated": "2026-09-23",
+  "sessions": ["2026-09-17", "2026-09-18", "2026-09-19", "2026-09-22", "2026-09-23"],
+  "last_run": {"date": "2026-09-23", "sources_ok": ["T1", "T2", "T3", "T4"],
+               "sources_failed": {}, "truncated": []},
+  "tickers": {
+    "INTU": {
+      "sources": ["T1"],
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-23",
+      "hit_dates": ["2026-09-19", "2026-09-22", "2026-09-23"],
+      "hit_sources_by_date": {"2026-09-19": ["T1"], "2026-09-22": ["T1"], "2026-09-23": ["T1"]}
+    }
+  }
+}
+```
+
+| Field | Notes |
+|---|---|
+| `sessions` | dates the feed ran with at least one scan answering, oldest first, trimmed to the last `max(window, prune_after)`. Persistence is counted in these, never in calendar days |
+| `last_run` | the latest call only, including one where every scan failed (which adds no session) |
+| `tickers.*.sources` | every scan that has hit the ticker while it has been in the file |
+| `tickers.*.hit_dates` | hits within the retained `sessions` |
+| pruning | a ticker is dropped once its `last_seen` falls outside the last `prune_after` sessions |
+
+The daily record carries a `screener_feed` block (`ran`, `hits`, `sources_failed`, `truncated`,
+`promotable`, `retired_rehit`, `multi_source`, `window_sessions`), and the weekly record carries
+its own (`promotable`, `admitted`, `rejected`, `deferred`, `retired_rehit`). The public sanitizer
+is an allowlist and copies neither block.
+
+A watchlist entry admitted from the feed carries `admitted_via: "screener_feed"` and
+`feed_sources`.
 
 ## Reader contracts
 

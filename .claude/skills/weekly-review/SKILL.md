@@ -148,6 +148,47 @@ evidence, furthest from its `mechanism_reverified_through` deadline, or a `statu
 from diluting average evidence quality — the failure mode a bigger list actually risks, not
 just token cost.
 
+## 7. Screener-feed candidates (ADR 0020) — read only
+
+`daily-screen` runs four saved Legend scans each session and records persistent hits in
+`state/screener-feed.json`. This skill **reads that file and never writes it.** Don't call
+`run_scan` or any other scanner tool here. The annex A exception covers `daily-screen` only.
+
+1. Load `state/screener-feed.json`. If it doesn't exist yet, say so in the output and skip this
+   section. That isn't a failure.
+2. Call `engine.feed.promotable(feed, watchlist, today, cfg)` against the watchlist as it
+   stands **after** §6's retirements. If `window_full` is false, report `window_sessions` and
+   stop here: nothing is promotable until the window fills. If `last_session` is more than a
+   few trading days old, flag that the daily feed may not be running.
+3. Treat each `promotable` ticker as an **admission candidate on exactly the same path as any
+   other**: a §5 mechanism with dated evidence, the §9 kill switch, §8 through Robinhood's SEC
+   tools for an M3 name, §10 pattern assignment and §16 invalidation rules. §6's cap-and-replace
+   applies too. There are no shortcuts: persistence in a price scan says the name is moving, not
+   that it has a mechanism. Rejecting most of them is the expected outcome. Work in the order
+   `promotable` returns (most hits first, multi-source first), and stop when the week's budget
+   for new names is spent. Carry the rest to next week; they'll still be in the feed if they
+   still qualify.
+4. `multi_source` names are a review-priority flag only. A name there still needs to be in
+   `promotable` to be considered for admission this week.
+5. `retired_rehit` names are **not** re-admitted automatically. Mention them. Re-admitting one
+   needs fresh evidence that whatever retired it no longer applies, recorded like any
+   admission.
+
+Known traps in the feed's sources:
+
+- **T2/T4 admit deep cash burners.** XNDU showed an operating margin near −1268% on
+  2026-09-23. §5's mechanism bar and §9's kill switch have to catch these. The feed doesn't.
+- **T4 skews to crypto and crypto-treasury names** in risk-on tapes (BMNR, SBET, BTDR, MARA).
+  Treat a cluster as one correlated bet. The 2026-09-03 bench-checks already found bitcoin
+  treasuries have no §5 mechanism.
+- **The quadrant sets entry timing.** T1/T2 ("falling now") fit §10's panic pattern. T3/T4
+  ("recovering off lows") fit breakout or quiet inflection. Use this when assigning
+  `permitted_entry_patterns`.
+
+**On admission, record provenance** on the new watchlist entry: `"admitted_via":
+"screener_feed"` and `"feed_sources": [...]`, copied from the item's `sources`. Names admitted
+any other way carry no `admitted_via` field.
+
 ## Output
 
 Write `weekly/YYYY-MM-DD.json` (see `docs/storage-schema-v7.md`), update `state/watchlist.json`
@@ -156,7 +197,14 @@ never the `ntm` field, which only `macro-refresh` writes), and commit + push in 
 `git add -A && git commit -m "weekly review YYYY-MM-DD: <one-line summary>" && git push`.
 Do not touch `state/macro-latest.json` or `state/nyse-constituents.json` at all — `macro-refresh`
 owns every key in the macro file except `hard_gates.equity_deleveraging` and `breadth`, which
-`daily-screen` owns, and `macro-refresh` owns the constituents list.
+`daily-screen` owns, and `macro-refresh` owns the constituents list. Never write
+`state/screener-feed.json` either: `daily-screen` is its only writer (ADR 0020).
+
+The weekly JSON gets a `screener_feed` block: `window_sessions`, `promotable` (the tickers
+considered), `admitted` (ticker + mechanism), `rejected` (ticker + the rule that rejected it, e.g.
+`"§5: no mechanism"`, `"§9: cash burn"`, `"cap: weaker than every current name"`), `deferred` (not
+reached this week) and `retired_rehit`. In the Slack summary, add one line:
+`Screener feed: <n> promotable | admitted: <tickers or none> | rejected: <n>`.
 
 ## Cost discipline
 
