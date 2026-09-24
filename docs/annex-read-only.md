@@ -51,7 +51,10 @@ to both spellings.
 
 The one `allow` rule is `run_scan` under both names (ADR 0020). It permits the tool, but the
 settings file can't restrict which scan IDs it's called with, so the ID and caller limits in the
-exception above rest on `daily-screen`'s skill text and this annex.
+exception above rest on `daily-screen`'s skill text and this annex. The scanner's two read tools,
+`get_scans` and `get_scanner_filter_specs`, are denied too (2026-09-24). They change nothing, but
+no skill needs them, and they are exactly what `run_scan`'s own response suggests calling when a
+scan errors or comes back empty. Discovering or re-tuning scans is a manual job in Legend.
 
 ## Rules that do not bend
 
