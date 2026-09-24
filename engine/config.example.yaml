@@ -173,3 +173,17 @@ macro_staleness:
     WALCL: weekly
     WTREGEN: weekly
     CAPE: monthly
+
+# Project addition, not in §20 (ADR 0020). A candidate source for Stage A --
+# never a gate. Scan IDs are account-specific and live only in the private
+# state/config.yaml; they stay null here. `enabled: false` skips the step.
+screener_feed:
+  enabled: true
+  scans:
+    T1: null   # Quality Dislocation (falling, quality)
+    T2: null   # Speculative Dislocation (falling, speculative)
+    T3: null   # Large Cap Recovery (recovering, quality)
+    T4: null   # Speculative Recovery (recovering, speculative)
+  min_hits: 3
+  window: 5
+  prune_after: 10
