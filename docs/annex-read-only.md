@@ -18,6 +18,13 @@ here as a project annex with the same force as the specification itself.
 `get_sec_filing_facts_catalog`, `get_sec_filing_index`, `search`, and watchlist **reads**
 (`get_watchlists`, `get_watchlist_items`, `get_option_watchlist`).
 
+**One scoped exception: `run_scan`** ([ADR 0020](decisions/0020-screener-feed-candidate-source.md),
+approved by the user 2026-09-24). It evaluates a saved scan's filters against current market data
+and returns the matching rows. It changes no scan configuration and no account state. It is
+allowed **only** on the scan IDs listed in `state/config.yaml` → `screener_feed.scans`, and
+**only** from `daily-screen`'s screener-feed step. No other skill, and no other scan ID. Every
+other scanner tool stays forbidden below, including to repair a scan that errors or drifts.
+
 ## Forbidden — never call, under any circumstances
 
 `place_option_order`, `review_option_order`, `place_equity_order`, `review_equity_order`,
@@ -25,7 +32,8 @@ here as a project annex with the same force as the specification itself.
 `cancel_option_exercise`, and any tool that creates, updates, or modifies account state —
 including watchlist writes (`add_to_watchlist`, `update_watchlist`, `remove_from_watchlist`,
 `create_watchlist`, `follow_watchlist`) and scan writes (`create_scan`, `update_scan_config`,
-`update_scan_filters`, `run_scan`).
+`update_scan_filters`). `run_scan` was listed here until ADR 0020 moved it to the scoped
+exception above.
 
 **Any tool not on the allowlist is forbidden by default.** These tools exist in the registry;
 their presence is not permission.
@@ -40,6 +48,10 @@ this contract is a control and not only a document. That matters since the weekl
 both names the connector goes by: `mcp__Robinhood__…` (the connection name in the cloud
 routines) and `mcp__48233777-…__…` (desktop sessions). If Robinhood adds a new write tool, add it
 to both spellings.
+
+The one `allow` rule is `run_scan` under both names (ADR 0020). It permits the tool, but the
+settings file can't restrict which scan IDs it's called with, so the ID and caller limits in the
+exception above rest on `daily-screen`'s skill text and this annex.
 
 ## Rules that do not bend
 

@@ -44,6 +44,17 @@ class ConfigTemplateTests(unittest.TestCase):
             {"symbol": "HYG", "hedge_symbol": "SHY", "lookback_sessions": 20, "drawdown_pct": 1.5},
         )
 
+    def test_screener_feed(self):
+        # Project addition (ADR 0020). Scan IDs are account-specific and live
+        # only in the private state/config.yaml, so the template keeps them null.
+        self.assertIs(get(self.cfg, "screener_feed.enabled"), True)
+        self.assertEqual(
+            get(self.cfg, "screener_feed.scans"), {"T1": None, "T2": None, "T3": None, "T4": None}
+        )
+        self.assertEqual(get(self.cfg, "screener_feed.min_hits"), 3)
+        self.assertEqual(get(self.cfg, "screener_feed.window"), 5)
+        self.assertEqual(get(self.cfg, "screener_feed.prune_after"), 10)
+
     def test_restricted_regime(self):
         self.assertEqual(get(self.cfg, "restricted_regime.trigger_R"), 3)
         self.assertEqual(get(self.cfg, "restricted_regime.score_threshold_normal"), 75)

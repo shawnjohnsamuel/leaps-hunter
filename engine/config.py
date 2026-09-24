@@ -4,15 +4,18 @@ threshold here, never as a literal in another engine module.
 
 config.example.yaml is an extraction of §20 from framework/v7.md — it
 exists for tests and as a template; if §20 changes, re-extract it. It differs
-from §20 in exactly two deliberate places, both project thresholds the spec
-never defined: `macro_hard_gates.equity_deleveraging.breadth_min_coverage`
-(ADR 0016) and the `tripwires` block (ADR 0017). v7.md itself stays verbatim,
-so re-extracting must carry both forward. The deployed file (state/config.yaml
+from §20 in deliberate places, all project settings the spec never defined:
+`macro_hard_gates.equity_deleveraging.breadth_min_coverage` (ADR 0016), the
+`tripwires` block (ADR 0017), the `macro_staleness` block (ADR 0018) and the
+`screener_feed` block (ADR 0020). v7.md itself stays verbatim, so re-extracting
+must carry all of them forward. The deployed file (state/config.yaml
 in the private data repo, added in Phase 4) is a copy of this template plus
-one addition: portfolio.account_ref, naming which Robinhood account to
-query. NAV itself stays out of every config file — it is read live each run
-and never written to disk in either repo (ADR 0013), so portfolio.nav here
-is permanently null, exactly as §20's own template has it.
+two additions: portfolio.account_ref, naming which Robinhood account to
+query, and the four screener_feed.scans IDs (ADR 0020), which are
+account-specific and stay null here. NAV itself stays out of every config
+file — it is read live each run and never written to disk in either repo
+(ADR 0013), so portfolio.nav here is permanently null, exactly as §20's own
+template has it.
 """
 from __future__ import annotations
 
