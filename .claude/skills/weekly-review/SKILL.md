@@ -44,12 +44,24 @@ return an explicit `EGRESS_BLOCKED` error for all three hosts. This is a fixed n
 not a bug; see `docs/decisions/0014-macro-fetch-desktop-only.md`. That refresh is now a separate
 skill, **`macro-refresh`**, run from a desktop session on its own cadence.
 
-In this skill, just **read** `state/macro-latest.json` and check its `as_of` date:
-- **≤7 days old** — use it as-is for the regime check below.
-- **>7 days old** — still use it (never block the whole run on this), but flag it prominently
-  and near the top of your output: `⚠️ MACRO STATE STALE (as_of: <date>) — run macro-refresh`.
-  This is the same "flag loudly, don't fabricate, don't halt" pattern `bench-check` already
-  uses for its own staleness check.
+In this skill, just **read** `state/macro-latest.json` and judge its age with
+`engine.macro.macro_staleness(last_refreshed, today, cfg)` — the top-level `last_refreshed`
+field, **not `as_of`** (ADR 0018). Act on the returned `.band`:
+- **`current`** — use it as-is for the regime check below.
+- **`flag`** or **`stop`** — still use it (never block the whole run on this), but flag it
+  prominently and near the top of your output:
+  `⚠️ MACRO STATE STALE (last refreshed <date>, <n> days) — run macro-refresh`. This is the
+  same "flag loudly, don't fabricate, don't halt" pattern `bench-check` uses. Unlike
+  `daily-screen`, a `stop` band does not halt this skill: nothing here sizes or enters a
+  position, and a structural review on two-week-old macro is still worth having.
+
+`as_of` is **not** the staleness basis and never was meant to be. It is the newest data date
+common to the fetched series, and WALCL publishes weekly, so a refresh that ran hours ago
+still carries an `as_of` 4–6 days old. Measuring against it made this skill flag
+`macro-latest.json` as stale on 2026-09-27 (`as_of` 09-16, 11 days) when the last real refresh
+was 6 days old and inside every tolerance — the same false alarm ADR 0018 removed from
+`daily-screen`, which this skill was simply never updated for. If `last_refreshed` is absent
+(a file written before ADR 0018), fall back to `as_of` and say in the output that you did.
 
 Read `hard_gates`, `restricted_regime.R`, `restricted_regime.score_threshold`, and
 `restricted_regime.kelly_multiplier` from the file directly — do not recompute them. If any

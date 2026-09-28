@@ -121,7 +121,21 @@ step the gate with `engine.macro.step_hard_gate` — passing the prior
 
 **This skill owns `hard_gates.equity_deleveraging` and the `breadth` block, and writes back
 those two keys only.** When breadth was computed, update `breadth.last_reading` with the
-result's fields and today's date; when it was skipped, leave the block untouched. `macro-refresh`
+result's fields and today's date; when it was skipped, leave the block untouched.
+
+**Rebuild the gate block from this session's own numbers — never copy a previous one.** Every
+field goes in fresh: `last_checked` is today's real date, `active` and
+`consecutive_release_days` come from `step_hard_gate`'s return, `trigger_fired_today` and
+`release_condition_met_today` from the two calls above, and the `note` quotes *this run's*
+VIX pair and `spx_pct_vs_200dma`. Do not paste a note from an earlier run, from a
+`daily/*.json` file, or from the copy of `macro-latest.json` you read at the start of a long
+session. On 2026-09-28 a run computed the gate correctly (VIX 15.89 / 14.87 prior, SPX +7.47%,
+recorded in `daily/2026-09-28.json`) and then wrote a 2026-09-23 block back over the 09-25 one:
+five days of the audit trail replaced by older data. Nothing changed that day because the gate
+was inactive with a 0 streak either way, but the same write against an *active* gate would
+rewind `consecutive_release_days` and delay a release, or re-apply a trigger day already
+counted. Record the same numbers in the daily JSON's `equity_deleveraging_fresh_check` and in
+this block, and make sure they agree before committing. `macro-refresh`
 owns every other key in the file and must not step this gate — double-stepping would corrupt
 the release streak. Split-key ownership of one file is the same pattern already
 used for `watchlist.json` (`macro-refresh` owns `ntm`, `weekly-review` owns the rest), and works

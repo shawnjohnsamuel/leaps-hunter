@@ -20,9 +20,14 @@ extractable, say so and stop). Multiple tickers: handle each briefly, or ask whi
 
 Read `state/watchlist.json` and `state/macro-latest.json`.
 
-- `state/macro-latest.json.as_of` more than 1 trading day old → banner the output
-  **STALE MACRO CONTEXT** and treat the regime read as low-confidence, but still use it rather
-  than recomputing (recomputing here is exactly the token cost this skill exists to avoid).
+- Judge the macro state's age from its top-level `last_refreshed` with
+  `engine.macro.macro_staleness(last_refreshed, today, cfg)`, **not `as_of`** (ADR 0018):
+  `as_of` tracks the slowest series in the file (WALCL is weekly), so it is 4–6 days old even
+  right after a refresh and a `1 trading day` rule against it banners every single run. Any
+  band other than `current` → banner the output **STALE MACRO CONTEXT** and treat the regime
+  read as low-confidence, but still use it rather than recomputing (recomputing here is
+  exactly the token cost this skill exists to avoid). If `last_refreshed` is missing, fall
+  back to `as_of` and say so.
 - Missing/unreadable → say so, note the macro read is unavailable, and continue with a
   narrower, more conservative read (§4d's spirit: missing data lowers confidence, it doesn't
   invalidate the exercise).
@@ -67,7 +72,8 @@ gets it a proper evidence review instead of guessing further here.
 ## Output contract
 
 Always headed:
-`⚡ BENCH CHECK — <ticker> — cached context from <macro-latest.json.as_of> — NOT a full screen`
+`⚡ BENCH CHECK — <ticker> — cached context refreshed <macro-latest.json.last_refreshed> (data
+as_of <macro-latest.json.as_of>) — NOT a full screen`
 (+ `STALE MACRO CONTEXT` banner when applicable)
 
 Then either the on-watchlist Stage-B-scoped result, or the off-watchlist verdict from the list
