@@ -49,7 +49,7 @@ class ConfigTemplateTests(unittest.TestCase):
         # only in the private state/config.yaml, so the template keeps them null.
         self.assertIs(get(self.cfg, "screener_feed.enabled"), True)
         self.assertEqual(
-            get(self.cfg, "screener_feed.scans"), {"T1": None, "T2": None, "T3": None, "T4": None}
+            get(self.cfg, "screener_feed.scans"), {f"T{i}": None for i in range(1, 8)}
         )
         self.assertEqual(get(self.cfg, "screener_feed.min_hits"), 3)
         self.assertEqual(get(self.cfg, "screener_feed.window"), 5)
