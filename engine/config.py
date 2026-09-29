@@ -11,7 +11,7 @@ from §20 in deliberate places, all project settings the spec never defined:
 must carry all of them forward. The deployed file (state/config.yaml
 in the private data repo, added in Phase 4) is a copy of this template plus
 two additions: portfolio.account_ref, naming which Robinhood account to
-query, and the four screener_feed.scans IDs (ADR 0020), which are
+query, and the screener_feed.scans IDs (ADR 0020), which are
 account-specific and stay null here. NAV itself stays out of every config
 file — it is read live each run and never written to disk in either repo
 (ADR 0013), so portfolio.nav here is permanently null, exactly as §20's own

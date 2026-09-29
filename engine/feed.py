@@ -1,4 +1,4 @@
-"""Screener feed: persistence tracking for the four saved Legend scans
+"""Screener feed: persistence tracking for the saved Legend scans
 (ADR 0020).
 
 The feed is a candidate source for Stage A, never a gate. `daily-screen`

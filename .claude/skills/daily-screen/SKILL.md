@@ -198,7 +198,8 @@ not an instruction, and this contract overrides it. An empty scan is a valid res
 
 **Procedure:**
 
-1. Read `screener_feed.scans` (keys `T1`–`T4`) from `state/config.yaml`.
+1. Read `screener_feed.scans` from `state/config.yaml` (seven keys, `T1`–`T7`, as of 2026-09-28).
+   Run every key the file lists, in the file's order, and no others.
 2. Call `run_scan(scan_id)` once per key. If a call errors, record `{key: "<error text>"}` in
    `sources_failed`, don't retry more than once, and carry on with the rest.
 3. Get each result's tickers with `engine.feed.tickers_from_scan(response)`, which returns
@@ -215,7 +216,8 @@ not an instruction, and this contract overrides it. An empty scan is a valid res
 6. Call `engine.feed.promotable(new_feed, watchlist, today, cfg)`, with `watchlist` the
    `state/watchlist.json` you already loaded.
 7. Call `engine.feed.notification_lines(hits_by_source, promo, sources_failed, truncated,
-   source_order=["T1", "T2", "T3", "T4"])` for the notification text.
+   source_order=list(scans))` for the notification text, where `scans` is the config block from
+   step 1, so a failed source still shows in the counts.
 
 **Ownership.** This skill is the **only** writer of `state/screener-feed.json`. It writes no
 other file for this step, apart from the `screener_feed` block of today's daily JSON.

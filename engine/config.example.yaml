@@ -184,6 +184,9 @@ screener_feed:
     T2: null   # Speculative Dislocation (falling, speculative)
     T3: null   # Large Cap Recovery (recovering, quality)
     T4: null   # Speculative Recovery (recovering, speculative)
+    T5: null   # Cheap Call Flow (options flow, any sector)
+    T6: null   # Quality at a Discount (value)
+    T7: null   # Precious Metals Pullback (XAU sleeve)
   min_hits: 3
   window: 5
   prune_after: 10

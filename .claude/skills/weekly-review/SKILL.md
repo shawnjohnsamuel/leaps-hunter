@@ -162,7 +162,7 @@ just token cost.
 
 ## 7. Screener-feed candidates (ADR 0020) — read only
 
-`daily-screen` runs four saved Legend scans each session and records persistent hits in
+`daily-screen` runs the saved Legend scans (seven as of 2026-09-28) each session and records persistent hits in
 `state/screener-feed.json`. This skill **reads that file and never writes it.** Don't call
 `run_scan` or any other scanner tool here. The annex A exception covers `daily-screen` only.
 
@@ -193,8 +193,16 @@ Known traps in the feed's sources:
 - **T4 skews to crypto and crypto-treasury names** in risk-on tapes (BMNR, SBET, BTDR, MARA).
   Treat a cluster as one correlated bet. The 2026-09-03 bench-checks already found bitcoin
   treasuries have no §5 mechanism.
-- **The quadrant sets entry timing.** T1/T2 ("falling now") fit §10's panic pattern. T3/T4
-  ("recovering off lows") fit breakout or quiet inflection. Use this when assigning
+- **T5 reads same-day options flow**, about 45 minutes of it at the daily run. A single T5 hit
+  is noise, which is what the persistence rule is for.
+- **T3, T6 and T7 overlap on gold and silver miners** (CDE, HL, AG, SBSW in T3 and T7; GFI in T6
+  and T7 on 2026-09-28). A multi-source flag from these pairs shows the metals moving together.
+  It is not independent confirmation.
+- **T7 is a sector sleeve.** Every hit moves with gold and silver, so treat a T7 cluster as one
+  correlated position. A miner still needs a real §5 mechanism: a metal price is not one.
+- **The source sets entry timing.** T1/T2 ("falling now") fit §10's panic pattern. T3/T4
+  ("recovering off lows") fit breakout or quiet inflection. T5 (call flow) suggests breakout;
+  T6 (cheap quality) suggests quiet inflection. Use this when assigning
   `permitted_entry_patterns`.
 
 **On admission, record provenance** on the new watchlist entry: `"admitted_via":
