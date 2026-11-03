@@ -60,6 +60,11 @@ entry_patterns:
     accelerating_metrics_min: 2
     estimate_revision_min_pct_60d: 5
     relative_underperformance_min_pts: 5
+    # ADR 0021 [ASSUMPTION]: §10 names no lookback or band. 42 sessions ~ the 60 calendar days
+    # of the NTM revision it is paired with.
+    relative_lookback_sessions: 42
+    range_bound_lookback_sessions: 42
+    range_bound_max_band_pct: 15
   breakout:
     high_lookback_days: [20, 120]
     max_30d_gain_pct: 20
@@ -84,7 +89,7 @@ option_vetoes:
   dte_range: [365, 900]
   quote_age_max_seconds: 60
   quoted_spread_max_pct: 6
-  open_interest_min: 500
+  open_interest_min: 250            # ADR 0021: was 500. Spread, quote age and volume vetoes unchanged.
   median_daily_volume_20d_min: 10
   max_premium_over_fair_value_pct: 10
 
@@ -190,3 +195,20 @@ screener_feed:
   min_hits: 3
   window: 5
   prune_after: 10
+
+# Project addition, not in §20 (ADR 0021). §9 says M2 invalidates on "material"
+# deceleration without a number, so §11's invalidation_clarity (minimum 5 of 5)
+# could never be met for M2 names. [ASSUMPTION] numbers, revisit in calibration.
+kill_switch_thresholds:
+  M2:
+    growth_decel_pp_per_report: 5      # YoY revenue or ARR growth, vs the prior report
+    consecutive_reports: 2
+
+# Project addition, not in §20 (ADR 0021). The §17 paper ledger. An entry is one
+# episode: a name that clears again while its entry is open is not a new
+# observation. It is marked at the contract's bid by weekly-review and closes
+# after outcome_horizon_days (or on a kill switch). Only closed entries count
+# toward min_comparable_observations_for_normal_size.
+calibration:
+  outcome_horizon_days: 180
+  mark_cadence_days: 7

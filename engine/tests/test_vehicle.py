@@ -261,8 +261,8 @@ class ScreenTests(unittest.TestCase):
         self.assertIn("catalyst_duration", failing(r.vehicles["leap"].gates))
 
     def test_leap_uses_v7_liquidity_thresholds(self):
-        # 400 OI clears stock-screen's short-dated floor (250) but not v7's (500).
-        r = screen(CFG, V7, inputs(leap=replace(LEAP, open_interest=400)), LIVE_RESTRICTED)
+        # The LEAP row reads v7's floor (250 since ADR 0021), not stock-screen's own.
+        r = screen(CFG, V7, inputs(leap=replace(LEAP, open_interest=200)), LIVE_RESTRICTED)
         self.assertIn("open_interest", failing(r.vehicles["leap"].gates))
 
     def test_earnings_inside_expiry_with_expensive_iv_penalizes_short_call(self):

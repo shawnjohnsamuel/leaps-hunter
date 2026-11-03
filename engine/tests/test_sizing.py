@@ -134,5 +134,20 @@ class FeasibilityTests(unittest.TestCase):
         self.assertGreater(unvalidated.min_feasible_nav, calibrated.min_feasible_nav)
 
 
+
+class FeasibilityDiagnosticsTests(unittest.TestCase):
+    def test_mu_2026_11_03_reproduces_the_logged_figures(self):
+        # daily/2026-11-03.json: MU Jan-2028 $600 call, P0 377.525, f_trade 0.0025.
+        r = compute_feasibility(0.0025, 37670.62, 377.525, calibrated_cap_pct=1.25)
+        self.assertEqual(r.n_max, 0)
+        self.assertAlmostEqual(r.min_feasible_nav, 15_101_000, delta=1_000)
+        self.assertAlmostEqual(r.min_feasible_nav_calibrated, 3_020_200, delta=100)
+        self.assertAlmostEqual(r.contract_pct_of_nav, 100.2, places=1)
+
+    def test_diagnostics_are_optional(self):
+        r = compute_feasibility(0.0025, 100_000, 5.0)
+        self.assertIsNone(r.min_feasible_nav_calibrated)
+
+
 if __name__ == "__main__":
     unittest.main()

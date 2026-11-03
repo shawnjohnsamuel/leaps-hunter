@@ -12,9 +12,13 @@ from engine.patterns import (
     QuietInflectionInputs,
     bottleneck_expansion_pattern,
     breakout_pattern,
+    multiple_expansion_ratio,
     panic_pattern,
+    price_60d_ago,
     quiet_inflection_pattern,
+    relative_underperformance_pts,
 )
+from engine.priceseries import is_range_bound
 from engine.sources import NTMResult
 
 CFG = load_config(TEMPLATE_PATH)
@@ -148,22 +152,73 @@ class BottleneckExpansionPatternTests(unittest.TestCase):
         self.assertFalse(bottleneck_expansion_pattern(CFG, self.flat_prices, short).qualifies)
         self.assertFalse(bottleneck_expansion_pattern(CFG, self.flat_prices, missing).qualifies)
 
-    def test_confirmed_needs_all_three_confirmation_inputs(self):
+    def test_confirmed_needs_pricing_evidence_and_no_failed_option_check(self):
         full = BottleneckExpansionInputs(
             backlog_vs_revenue_growth_pts=18.0,
             backlog_to_revenue_stable_or_rising=True,
             pricing_or_margin_evidence=True,
             option_valuation_passed=True,
         )
-        missing_option_check = BottleneckExpansionInputs(
+        deferred_option_check = BottleneckExpansionInputs(
             backlog_vs_revenue_growth_pts=18.0,
             backlog_to_revenue_stable_or_rising=True,
             pricing_or_margin_evidence=True,
         )
-        self.assertTrue(bottleneck_expansion_pattern(CFG, self.flat_prices, full).confirmed)
-        self.assertFalse(
-            bottleneck_expansion_pattern(CFG, self.flat_prices, missing_option_check).confirmed
+        failed_option_check = BottleneckExpansionInputs(
+            backlog_vs_revenue_growth_pts=18.0,
+            backlog_to_revenue_stable_or_rising=True,
+            pricing_or_margin_evidence=True,
+            option_valuation_passed=False,
         )
+        no_pricing = BottleneckExpansionInputs(
+            backlog_vs_revenue_growth_pts=18.0, backlog_to_revenue_stable_or_rising=True
+        )
+        self.assertTrue(bottleneck_expansion_pattern(CFG, self.flat_prices, full).confirmed)
+        # ADR 0021: None defers the check to §12, which runs it before any CANDIDATE.
+        r = bottleneck_expansion_pattern(CFG, self.flat_prices, deferred_option_check)
+        self.assertTrue(r.confirmed)
+        self.assertIn("deferred to §12", " ".join(r.reasons))
+        self.assertFalse(bottleneck_expansion_pattern(CFG, self.flat_prices, failed_option_check).confirmed)
+        self.assertFalse(bottleneck_expansion_pattern(CFG, self.flat_prices, no_pricing).confirmed)
+
+
+class ComputedPatternInputTests(unittest.TestCase):
+    def test_multiple_expansion_ratio_zero_when_price_tracks_estimates(self):
+        self.assertAlmostEqual(multiple_expansion_ratio(112.0, 100.0, GOOD_NTM), 0.0)
+
+    def test_multiple_expansion_ratio_above_half_when_price_outruns_estimates(self):
+        # +30% price on +12% estimates: multiple +16.1%, ratio ~1.34.
+        self.assertGreater(multiple_expansion_ratio(130.0, 100.0, GOOD_NTM), 0.5)
+
+    def test_multiple_compression_is_negative(self):
+        self.assertLess(multiple_expansion_ratio(100.0, 100.0, GOOD_NTM), 0.0)
+
+    def test_unresolved_without_an_estimate_improvement_or_old_price(self):
+        self.assertIsNone(multiple_expansion_ratio(110.0, 100.0, CUT_NTM))
+        self.assertIsNone(multiple_expansion_ratio(110.0, 100.0, UNAVAILABLE_NTM))
+        self.assertIsNone(multiple_expansion_ratio(110.0, 100.0, None))
+        self.assertIsNone(multiple_expansion_ratio(110.0, None, GOOD_NTM))
+
+    def test_breakout_confirms_with_the_computed_ratio(self):
+        prices = [100.0] * 100 + [100.0 + i * 0.5 for i in range(1, 21)]  # gentle new high
+        ratio = multiple_expansion_ratio(prices[-1], 100.0, GOOD_NTM)  # +10% price, +12% EPS
+        r = breakout_pattern(CFG, prices, BreakoutInputs(ntm=GOOD_NTM, multiple_expansion_ratio=ratio))
+        self.assertTrue(r.clears)
+
+    def test_price_60d_ago_reads_the_close_on_or_before(self):
+        closes = [("2026-09-01", 90.0), ("2026-09-03", 95.0), ("2026-09-08", 99.0)]
+        self.assertEqual(price_60d_ago(closes, "2026-11-03"), 95.0)  # 60d back = 09-04
+        self.assertIsNone(price_60d_ago(closes, "2026-10-01"))
+
+    def test_relative_underperformance(self):
+        stock = [100.0] * 10 + [95.0]
+        sector = [100.0] * 10 + [103.0]
+        self.assertAlmostEqual(relative_underperformance_pts(stock, sector, 10), 8.0)
+        self.assertIsNone(relative_underperformance_pts(stock[:3], sector, 10))
+
+    def test_range_bound(self):
+        self.assertTrue(is_range_bound([100.0, 104.0, 98.0, 102.0], 4, 10))
+        self.assertFalse(is_range_bound([100.0, 120.0, 98.0, 102.0], 4, 10))
 
 
 if __name__ == "__main__":

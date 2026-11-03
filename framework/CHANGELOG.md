@@ -1,5 +1,13 @@
 # Framework version lineage
 
+
+## v7.2 — pipeline overhaul after 50 sessions (2026-11-03, [ADR 0021](../docs/decisions/0021-pipeline-overhaul-after-50-sessions.md))
+v7.md stays verbatim; the changes live in config and the engine. Three of §10's four patterns
+had never cleared because their inputs were never supplied: they are now computed or cached
+by Stage A. `option_implementation` and `invalidation_clarity` are scored mechanically, M2's
+"material" deceleration has a number, the LEAP open-interest floor drops from 500 to 250, the
+§17 paper ledger gets marks and closes so calibration can progress, and the macro refresh
+moves from a desktop task to a GitHub Action.
 ## v7.0 — governing specification (adopted 2026-09-03, [v7.md](v7.md))
 Not a revision of v6 but a replacement of its machine: v6 was a rubric a model followed, v7 is
 a risk engine a model feeds. Supplied by the user after many revisions; lineage is a hardened

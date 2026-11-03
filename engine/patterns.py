@@ -7,13 +7,19 @@ differently on purpose (ADR 0010):
   estimate revision — are computed here from price series and
   `engine.sources.NTMResult`.
 - **Judgment** conditions — "2 of 5 fundamentals accelerating," "pricing or
-  incremental-margin evidence," a multiple-expansion ratio, backlog-vs-
-  revenue growth — require reading company disclosures or data this engine
-  has no wired source for. Those arrive as explicit, typed, optional
-  parameters that the calling skill fills in from its own research. This
-  module never invents a number for one of these; a pattern whose judgment
-  input is missing is **not confirmed**, never silently passed — §3: an
-  unobtainable required metric disqualifies, it does not default to true.
+  incremental-margin evidence," backlog-vs-revenue growth — require reading
+  company disclosures. Those arrive as explicit, typed, optional parameters
+  that `weekly-review` caches per name (`pattern_inputs` in
+  state/watchlist.json). This module never invents a number for one of
+  these; a pattern whose judgment input is missing is **not confirmed**,
+  never silently passed — §3: an unobtainable required metric disqualifies,
+  it does not default to true.
+
+ADR 0021: through 2026-11-03 only `panic` had ever cleared, because the other
+three patterns' inputs were never supplied. Three of them turned out to be
+computable, and are now: `multiple_expansion_ratio` (price vs the NTM
+revision over the same 60 days), `relative_underperformance_pts` (stock vs a
+sector ETF) and `priceseries.is_range_bound`.
 
 All patterns return a `PatternResult` with `qualifies` (the quantitative
 minimum) and `confirmed` (the confirmation column) evaluated separately,
@@ -25,7 +31,7 @@ import statistics
 from dataclasses import dataclass, field
 
 from .config import get
-from .priceseries import daily_returns, pct_change, rolling_max
+from .priceseries import daily_returns, pct_change, rolling_max, value_on_or_before
 from .sources import NTMResult
 
 
@@ -101,6 +107,44 @@ def panic_pattern(cfg: dict, prices: list[float], ntm: NTMResult | None) -> Patt
 
 def _stdev(values: list[float]) -> float:
     return statistics.stdev(values) if len(values) >= 2 else 0.0
+
+
+# ------------------------------------------------- computed pattern inputs -
+
+def multiple_expansion_ratio(price_now: float, price_60d_ago: float | None,
+                             ntm: NTMResult | None) -> float | None:
+    """Breakout's "multiple expansion less than half the fundamental-estimate
+    improvement" (§10), computed instead of judged (ADR 0021).
+
+    Over the same 60 days the NTM revision covers, the forward multiple moves
+    by (1 + price change) / (1 + NTM EPS change) − 1. The ratio is that
+    expansion divided by the estimate improvement, so 0.0 means the stock
+    rose exactly with estimates and anything negative means the multiple
+    compressed. None (unresolved, so not confirmed) when the NTM figure is
+    unavailable, the estimate did not improve, or the old price is missing."""
+    if ntm is None or not ntm.available or ntm.revision_pct is None or ntm.revision_pct <= 0:
+        return None
+    if not price_60d_ago or price_60d_ago <= 0:
+        return None
+    eps_change = ntm.revision_pct / 100.0
+    expansion = (price_now / price_60d_ago) / (1 + eps_change) - 1
+    return expansion / eps_change
+
+
+def price_60d_ago(dated_closes: list[tuple[str, float]], today: str) -> float | None:
+    """The close on or before the calendar date 60 days before `today` —
+    the same window Alpha Vantage's `_60_days_ago` estimates use."""
+    from datetime import date, timedelta
+    target = (date.fromisoformat(today) - timedelta(days=60)).isoformat()
+    return value_on_or_before(dated_closes, target)
+
+
+def relative_underperformance_pts(stock: list[float], sector: list[float], lookback: int) -> float | None:
+    """Sector return minus stock return over `lookback` sessions, in points —
+    positive when the stock lagged. None if either series is too short."""
+    if len(stock) <= lookback or len(sector) <= lookback:
+        return None
+    return pct_change(sector, lookback) - pct_change(stock, lookback)
 
 
 # ---------------------------------------------------------- quiet inflection
@@ -204,9 +248,15 @@ def breakout_pattern(cfg: dict, prices: list[float], inputs: BreakoutInputs) -> 
 @dataclass(frozen=True)
 class BottleneckExpansionInputs:
     """Backlog/order data is fundamentals-derived (SEC filings, investor
-    presentations) — no wired source computes it generically here. The
-    option-valuation check depends on engine.optmodel, not built until
-    Phase 3; a None there leaves confirmation unresolved, not passed."""
+    presentations) and arrives from `weekly-review`'s cached
+    `pattern_inputs.bottleneck_expansion`.
+
+    `option_valuation_passed`: §10's "no failed option-valuation test" is the
+    §12 model itself, which only runs after §10 and §11 have passed, so it
+    can't be known here. None means **deferred to §12**, where the same test
+    is mandatory before any CANDIDATE (ADR 0021): requiring it at §10 made the
+    pattern unclearable by construction. False (a §12 run already failed it)
+    still blocks."""
 
     backlog_vs_revenue_growth_pts: float | None = None
     backlog_to_revenue_stable_or_rising: bool | None = None
@@ -239,10 +289,12 @@ def bottleneck_expansion_pattern(
     )
 
     pricing_ok = bool(inputs.pricing_or_margin_evidence)
-    option_ok = bool(inputs.option_valuation_passed)
+    option_ok = inputs.option_valuation_passed is not False
+    option_note = ("deferred to §12" if inputs.option_valuation_passed is None
+                   else inputs.option_valuation_passed)
     reasons.append(
         f"pricing/margin evidence={inputs.pricing_or_margin_evidence}, "
-        f"option-valuation passed={inputs.option_valuation_passed} (Phase 3 dependency)"
+        f"option-valuation passed={option_note}"
     )
 
     confirmed = gain_ok and pricing_ok and option_ok
