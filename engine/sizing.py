@@ -206,3 +206,71 @@ def compute_feasibility(f_trade: float, nav: float, entry_price_per_share: float
     min_nav = (100 * entry_price_per_share) / f_trade
     return FeasibilityResult(n_max=n_max, feasible=n_max >= 1, min_feasible_nav=min_nav,
                              contract_pct_of_nav=pct, min_feasible_nav_calibrated=cal)
+
+
+# ------------------------------------------- share fallback (ADR 0022) ------
+
+@dataclass(frozen=True)
+class ShareFallbackResult:
+    """What the same clear would mean as shares, when no LEAP or spread fits
+    the account (ADR 0022). Same scenarios, same robust Kelly and regime
+    multiplier as §14; only the vehicle and its loss cap differ."""
+
+    f_robust: float
+    fraction_of_nav: float      # capital in the shares
+    binding: str                # "kelly", "max_loss_cap" or "no_edge"
+    dollars: float
+    shares: float               # fractional, 4 dp
+    whole_shares: int
+    worst_move: float           # the worst scenario's price change, e.g. -0.30
+    loss_at_worst: float        # dollars lost if that scenario plays out
+    loss_at_worst_pct_nav: float
+    review_price: float         # spot at the worst scenario: a §16 review trigger, never an automatic stop
+    ev: float
+    ev_to_el: float | None
+    robust_log_growth: float    # E[log(1 + fraction*R)] at the chosen size
+    passes_acceptance: bool     # §12.3's three tests, applied to the share returns
+
+
+def share_fallback(cfg: dict, spot: float, probs: list[float], moves: list[float],
+                   kelly_multiplier: float, nav: float, n_draws: int | None = None,
+                   seed: int | None = None) -> ShareFallbackResult:
+    """Size shares from the candidate's own §12.3 scenarios. `moves` are the
+    underlying's price changes per scenario (−0.30 = −30%), the same ones the
+    LEAP was priced on, so the share analysis can't use a rosier story.
+
+    f_robust is the 10th-percentile Kelly fraction over posterior draws
+    (§14), capped at 1.0 because shares here are never bought on margin.
+    The position is min(kelly_multiplier × f_robust, the max-loss cap), where
+    the cap is `share_fallback.max_loss_pct_nav` of NAV lost at the worst
+    scenario. Acceptance is §12.3's: EV above `acceptance.ev_net_min`,
+    EV/EL at least `acceptance.ev_to_expected_loss_min`, positive log growth."""
+    if spot <= 0 or nav <= 0:
+        raise ValueError("spot and NAV must be positive")
+    draws = generate_posterior_draws(probs, moves, n_draws or get(cfg, "sizing.kelly_posterior_draws_min"), seed=seed)
+    f_robust = robust_kelly_fraction(draws, f_cap=1.0, quantile=get(cfg, "sizing.f_robust_quantile"))
+    worst = min(moves)
+    ev = sum(p * m for p, m in zip(probs, moves))
+    el = sum(p * max(0.0, -m) for p, m in zip(probs, moves))
+    ev_to_el = ev / el if el > 0 else None
+    if f_robust <= 0:
+        fraction, binding = 0.0, "no_edge"
+    else:
+        kelly = kelly_multiplier * f_robust
+        cap = (get(cfg, "share_fallback.max_loss_pct_nav") / 100.0) / -worst if worst < 0 else 1.0
+        fraction, binding = (kelly, "kelly") if kelly <= cap else (cap, "max_loss_cap")
+    dollars = fraction * nav
+    growth = _kelly_growth(fraction, probs, moves)
+    passes = (
+        ev > get(cfg, "acceptance.ev_net_min")
+        and ev_to_el is not None and ev_to_el >= get(cfg, "acceptance.ev_to_expected_loss_min")
+        and growth > get(cfg, "acceptance.robust_log_growth_min")
+    )
+    loss = dollars * max(0.0, -worst)
+    return ShareFallbackResult(
+        f_robust=f_robust, fraction_of_nav=fraction, binding=binding, dollars=round(dollars, 2),
+        shares=round(dollars / spot, 4), whole_shares=math.floor(dollars / spot), worst_move=worst,
+        loss_at_worst=round(loss, 2), loss_at_worst_pct_nav=loss / nav * 100.0,
+        review_price=round(spot * (1 + worst), 2), ev=ev, ev_to_el=ev_to_el,
+        robust_log_growth=growth, passes_acceptance=passes,
+    )

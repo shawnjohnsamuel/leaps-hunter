@@ -1,6 +1,12 @@
 # Framework version lineage
 
 
+
+## v7.3 — share fallback and spread path (2026-11-03, [ADR 0022](../docs/decisions/0022-share-fallback-and-spread-path.md))
+A clear the account can't hold as a LEAP (MU, 2026-11-02/03: one contract ≈ 100% of NAV) now
+reports what it means as shares, sized from the same scenarios and robust Kelly under a
+configurable loss cap. On a level-3 account, §13.3's spread step is computed rather than
+skipped. What clears is unchanged.
 ## v7.2 — pipeline overhaul after 50 sessions (2026-11-03, [ADR 0021](../docs/decisions/0021-pipeline-overhaul-after-50-sessions.md))
 v7.md stays verbatim; the changes live in config and the engine. Three of §10's four patterns
 had never cleared because their inputs were never supplied: they are now computed or cached

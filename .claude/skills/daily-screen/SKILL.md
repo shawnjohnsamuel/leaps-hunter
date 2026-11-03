@@ -32,6 +32,8 @@ Output `NO TRADE — DATA INSUFFICIENT`, name the missing input, and stop:
    `get_equity_positions`/`get_option_positions` with **that exact account number**, never a
    default or an inferred one. Phase 0 found what picking wrong costs: a $0-NAV account
    produces a `NO TRADE` that looks like ordinary discipline on every single run, forever.
+   Record the account's `option_level` from `get_accounts` (for example `option_level_2`) in
+   the daily JSON. §3e.1's spread path needs `option_level_3`.
 5. **§12.1's 60-second quote-age rule means this cannot run pre-market.** If run before the
    opening auction has settled (roughly the first 15 minutes), quotes read as artifacts in
    both directions (confirmed empirically in this project's own 2026-07-09 run). Prefer
@@ -355,15 +357,55 @@ observation, not several. A new entry carries `contract_expiration`, `strike` an
 it, plus `marks: []` and `realized_outcome: null`. Don't write `nav_at_run` into this file: NAV
 is never stored on disk (ADR 0013), and `contract_pct_of_nav` says what matters.
 
+**3e.1. Spread, only when the outright is infeasible (§13.3, ADR 0022).** §13.3 says: if
+`N_max = 0`, reject the outright, *then* evaluate a spread against §13.2. Do that only if the
+account's `option_level` is `option_level_3` (spreads are a level-3 strategy). Otherwise record
+`"spread": "not evaluated -- account is <level>, spreads need option_level_3"` and go to 3e.2.
+
+1. Short strike: `engine.optmodel.min_short_strike(spot, T, r, q, short_iv, max_prob)` with
+   `max_prob = spread_rule.max_prob_above_short_strike`, rounded **up** to the next listed strike
+   in the same expiration as the long leg. Quote both legs; both must pass §12.1's vetoes.
+2. Debit: `engine.optmodel.spread_debit(long_ask, long_bid, short_bid, short_ask, fees, cfg)`.
+3. Returns: `engine.optmodel.spread_returns(debit, k_long, k_short, scenario_spots, tau, r, q,
+   scenario_ivs)`, using the **same** scenarios the outright was priced on. Then the same §14
+   chain as 3e (posterior draws → `robust_kelly_fraction` → `compute_f_trade`, with the
+   `single_itm_or_spread` caps) and `compute_feasibility(f_trade, nav, debit)`.
+4. `engine.optmodel.evaluate_spread_rule` with both structures' robust log growth, the
+   feasibility result as `debit_fits_nav_budget`, both legs' liquidity, `prob_above` at the
+   listed short strike, and whether the spread's EV is positive. All five must pass.
+
+Expect this to fail feasibility often at the current caps. v7's 25% rule puts the short strike
+far out, so a compliant spread still costs roughly 55–65% of the outright (checked 2026-11-03).
+A spread that passes everything is a `CANDIDATE` with `structure: "vertical_debit_spread"`.
+
+**3e.2. Share fallback (ADR 0022).** If nothing option-based fits and `share_fallback.enabled`
+is true, report what the same clear means as shares. Call
+`engine.sizing.share_fallback(cfg, spot, probs, moves, kelly_multiplier, nav)`, where `spot` is
+the live share price and `probs` / `moves` are the §12.3 scenarios' probabilities and underlying
+price changes. They're the same ones the LEAP was priced on, so the share case can't use a better
+story. If `passes_acceptance` is true, the name is a **share candidate**. Record the result as
+`share_fallback` in the name's daily JSON entry (every field of the result, plus `spot` and the
+quote time) and on its `state/calibration.json` entry, so `weekly-review` can mark both
+vehicles. If it fails acceptance, say which test failed. The `fail_category` stays
+`s14_infeasible` either way: the vocabulary is fixed, and the public sanitizer never publishes
+the `share_fallback` block.
+
 **3f. Portfolio risk (§15).** Only meaningfully binding once real positions exist —
 `engine.portfolio.evaluate_portfolio_risk` against the book with and without this candidate.
 With an empty book this trivially passes; say so rather than skipping the check silently.
 
 A name that clears every step above is a `CANDIDATE`. A name that clears everything except
-§13.3 feasibility is a **paper candidate**: say so by name in the notification, with its score,
-contract, `contract_pct_of_nav` and `min_feasible_nav_calibrated`, e.g. `Paper candidate: MU
-(Micron Technology) 81/80, Jan-2028 $600C, one contract = 100% of NAV, needs $3.0M NAV even after
-calibration`. It is the most useful line the run produces. Everything else is `NO TRADE` for that
+§13.3 feasibility is a **share candidate** if 3e.2 passed, and a **paper candidate** if not.
+Either goes in the notification by name, as analysis: never "buy", never an instruction. For
+example:
+
+`SHARE CANDIDATE: MU (Micron Technology) 81/80. LEAP Jan-2028 $600C infeasible (one contract =
+100% of NAV; $3.0M NAV even after calibration); spread not evaluated (option_level_2). As
+shares at $833.59: $314 (0.38 sh), -$94 (0.25% of NAV) in the bear case (-30%), §16 review
+below $583.51. Sized by the loss cap; the risk model alone would allow 12.5% of NAV.`
+
+That line is the most useful thing the run produces. Keep the binding limit in it, because it
+tells the user which setting is shaping the number. Everything else is `NO TRADE` for that
 name today, with the specific gate or threshold that stopped it recorded (§18 requires naming
 it). Record each name's `mechanism` (copied straight from `state/watchlist.json`, not
 re-derived) alongside its result — Phase 7's public sanitizer tags every published name by

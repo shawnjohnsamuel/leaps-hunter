@@ -33,6 +33,10 @@ class LedgerTests(unittest.TestCase):
         mark(e, "2026-11-16", None, note="no quote")
         self.assertNotIn("return_pct", e["marks"][1])
 
+    def test_mark_tracks_the_share_fallback_too(self):
+        e = mark(_entry(share_fallback={"spot": 833.59}), "2026-11-09", 400.0, share_price=870.0)
+        self.assertAlmostEqual(e["marks"][0]["share_return_pct"], 4.37, places=2)
+
     def test_close_uses_the_latest_priced_mark(self):
         e = _entry()
         mark(e, "2026-11-09", 400.0)

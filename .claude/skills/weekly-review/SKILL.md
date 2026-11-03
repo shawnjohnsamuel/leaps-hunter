@@ -266,7 +266,9 @@ and no `duplicate_of`:
    carry only the `contract` string, e.g. `"2028-01-21 $600 call"`) with `get_option_instruments`
    and `get_option_quotes`. Mark it with `engine.ledger.mark(entry, today, bid)`, the bid being
    what a paper exit would actually get. If there's no quote, mark `bid: None` with a note. Never
-   estimate one.
+   estimate one. If the entry has a `share_fallback` block (ADR 0022), also pass
+   `share_price=` the last share price from `get_equity_quotes`, so the share alternative builds
+   its own record beside the option's.
 2. Close it with `engine.ledger.close(entry, today, reason)` if `engine.ledger.due_to_close` is
    true (`reason: "horizon"`), or if this review fired the name's §9 kill switch
    (`reason: "kill_switch"`). Close at the latest priced mark. `close` refuses if there isn't

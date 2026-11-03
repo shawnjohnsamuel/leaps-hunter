@@ -212,3 +212,12 @@ kill_switch_thresholds:
 calibration:
   outcome_horizon_days: 180
   mark_cadence_days: 7
+
+# Project addition, not in §20 (ADR 0022). When a candidate clears every gate
+# through §13.2 but no LEAP or spread fits the account (§13.3), report what the
+# same clear means as shares: same scenarios, robust Kelly and regime throttle,
+# sized by engine.sizing.share_fallback. Analysis only, like everything here.
+share_fallback:
+  enabled: true
+  max_loss_pct_nav: 0.25   # % of NAV lost if the worst scenario plays out. The user's
+                           # stock-screen choice (2026-09-21), mirroring §17; theirs to change.
