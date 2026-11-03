@@ -1,6 +1,6 @@
 # ADR 0022: A share fallback and a spread path for clears the account can't hold as LEAPs
 
-**Status:** accepted (2026-11-03) · **Extends:** §13.3 (account feasibility), §13.2 (spread
+**Status:** accepted (2026-11-03), amended the same day (caps, below) · **Extends:** §13.3 (account feasibility), §13.2 (spread
 rule), [ADR 0013](0013-paper-ledger-and-nav-integrity.md), [ADR 0021](0021-pipeline-overhaul-after-50-sessions.md)
 
 ## Context
@@ -55,3 +55,15 @@ same §14 chain and caps as the outright, and must pass all five §13.2 conditio
 - Spreads mostly won't fit at the 0.25%/1.25% option caps either. They become relevant if the
   user raises those caps; that, like the share cap, is a risk decision this ADR doesn't make.
 - Nothing about what clears changes. Only what a clear produces does.
+
+## Amendment (2026-11-03): per-mechanism and total caps
+
+The user set the per-position share cap to 2% of NAV and asked for two more limits, because
+clears cluster: five names cleared the panic pattern together on 2026-11-03.
+`share_fallback.max_loss_pct_nav_per_mechanism` (3%) and `max_loss_pct_nav_total` (8%) mirror v7's
+`single_mechanism` and `total_leaps_book` caps. Like the per-position cap, they're measured as
+loss at each position's worst scenario. `engine.sizing.existing_share_risk` counts held watchlist
+names. A held name uses its open ledger entry's worst move, or `held_worst_move_pct` (30%,
+`[ASSUMPTION]`) when there isn't one. daily-screen sizes same-day candidates in score order
+against running totals. At 2% MU's 11-03 clear sizes to about $2,511 (3.0 shares); a second M1
+clear the same day would get the 1% left under the mechanism cap.

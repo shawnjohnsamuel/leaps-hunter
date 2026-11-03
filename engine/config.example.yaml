@@ -219,5 +219,9 @@ calibration:
 # sized by engine.sizing.share_fallback. Analysis only, like everything here.
 share_fallback:
   enabled: true
-  max_loss_pct_nav: 0.25   # % of NAV lost if the worst scenario plays out. The user's
-                           # stock-screen choice (2026-09-21), mirroring §17; theirs to change.
+  # All three are % of NAV lost if each position's worst scenario plays out.
+  max_loss_pct_nav: 0.25   # per position
+  max_loss_pct_nav_per_mechanism: 3   # same as v7's single_mechanism cap; clears cluster by sector
+  max_loss_pct_nav_total: 8           # same as v7's total_leaps_book cap
+  held_worst_move_pct: 30             # [ASSUMPTION] worst move for a held watchlist name with no
+                                      # logged scenario, when counting risk already on
