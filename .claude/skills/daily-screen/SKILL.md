@@ -42,10 +42,12 @@ screener-feed step (after step 1) before writing the day's file. Item 1 (market 
 
 ## 1. Macro gate check (§6.1) — portfolio-wide, run once
 
-`state/macro-latest.json` is written by **`macro-refresh`**, a desktop-only skill — FRED, Shiller
-CAPE and Alpha Vantage are egress-blocked from cloud routines (ADR 0014). Neither this skill nor
-`weekly-review` can refresh the slow-moving series in it. Read the `restricted_regime` block;
-never re-derive it.
+`state/macro-latest.json` is written by the **macro-refresh GitHub Action** in the data repo
+(`.github/workflows/macro-refresh.yml` running `scripts/macro_refresh.py`, ADR 0021), every
+weekday at 14:00 UTC, about an hour before this routine. FRED, Shiller CAPE and Alpha Vantage
+are egress-blocked from cloud routines (ADR 0014), so neither this skill nor `weekly-review` can
+refresh the slow-moving series in it. Read the `restricted_regime` block; never re-derive it.
+On a normal day the staleness band below is `current`. Anything else means the Action failed.
 
 **1a. Staleness check.** Call `engine.macro.macro_staleness(last_refreshed, today, cfg)`, where
 `last_refreshed` is the top-level field in `state/macro-latest.json`. Act on `.band`:
@@ -53,7 +55,7 @@ never re-derive it.
 - **`current`** — use it as-is.
 - **`flag`** — use it, but record a `macro.staleness_flag` string in today's
   `daily/YYYY-MM-DD.json` *and* lead this run's notification with
-  `⚠️ MACRO STATE STALE (last refreshed <date>, <n> days) — run macro-refresh`. The R throttle
+  `⚠️ MACRO STATE STALE (last refreshed <date>, <n> days) — the macro-refresh GitHub Action is failing, check its runs`. The R throttle
   sets `score_threshold`, the binding constraint on most near-misses, so a stale read silently
   moves every verdict. Put it where a human will see it, not only in the JSON.
 - **`stop`** — stop with `NO TRADE — DATA INSUFFICIENT`, naming `state/macro-latest.json` as the
@@ -260,24 +262,55 @@ call). A failing gate here ends this name's screen for today — do not spend op
 calls on a name that's already rejected.
 
 **2b. §10 entry patterns** — for each pattern in the name's `permitted_entry_patterns`:
-- `panic` → `engine.patterns.panic_pattern`, needs recent daily closes
-  (`get_equity_historicals`) and an `NTMResult` (reuse the cached one in each name's `ntm` field
-  in `state/watchlist.json`, written by `macro-refresh` — do not re-fetch Alpha Vantage here.
-  It is egress-blocked from cloud routines anyway, and avoiding that call is exactly the token
-  cost the weekly/daily split exists to avoid).
-- `quiet_inflection` → `engine.patterns.quiet_inflection_pattern`, needs the `accelerating_metrics_count`
-  judgment call (from the name's Stage A evidence) and the cached `NTMResult`.
-- `breakout` → `engine.patterns.breakout_pattern`, needs closes and the cached `NTMResult`.
-- `bottleneck_expansion` → `engine.patterns.bottleneck_expansion_pattern`, needs Stage A's
-  backlog-vs-revenue evidence.
+Pull **one** `get_equity_historicals` call per batch of up to 10 names, `interval: day`, with
+`start_time` about 200 calendar days back: enough for breakout's 120-session high and the close
+60 calendar days ago. Add each active name's `sector_etf` to the same batches. Parse with
+`engine.sources.parse_robinhood_daily_closes`.
+
+Through 2026-11-03 only `panic` had ever cleared, because the other three patterns' inputs were
+never supplied (ADR 0021). Supply them as follows. Every one is either computed by an engine
+function or read from Stage A's cache, so none is a judgment call here:
+
+- `panic` → `engine.patterns.panic_pattern`, with the closes and an `NTMResult` built from the
+  name's cached `ntm` field in `state/watchlist.json` (written by the macro-refresh Action — never
+  re-fetch Alpha Vantage here).
+- `breakout` → `engine.patterns.breakout_pattern`, with
+  `BreakoutInputs(ntm, multiple_expansion_ratio=engine.patterns.multiple_expansion_ratio(close_today,
+  engine.patterns.price_60d_ago(dated_closes, today), ntm))`. The ratio is computed, never
+  estimated: it comes back `None` (so not confirmed) when NTM is unavailable or estimates fell.
+- `quiet_inflection` → `engine.patterns.quiet_inflection_pattern`, with
+  `accelerating_metrics_count` from the name's `pattern_inputs.quiet_inflection` (written by
+  `weekly-review`, ADR 0021), `relative_underperformance_pts` from
+  `engine.patterns.relative_underperformance_pts(closes, sector_etf_closes,
+  cfg.entry_patterns.quiet_inflection.relative_lookback_sessions)`, and `is_range_bound` from
+  `engine.priceseries.is_range_bound(closes, range_bound_lookback_sessions,
+  range_bound_max_band_pct)`.
+- `bottleneck_expansion` → `engine.patterns.bottleneck_expansion_pattern`, with
+  `BottleneckExpansionInputs(**pattern_inputs.bottleneck_expansion)` (dropping its `basis`
+  text). Leave `option_valuation_passed` as `None`: the engine reads that as **deferred to §12**,
+  which runs the same test before any CANDIDATE.
+
+If a cached input a pattern needs is missing, the pattern is unresolved. Record
+`s10_unresolved_confirmation` naming the missing field (for example
+`"pattern_inputs.quiet_inflection missing -- weekly-review"`) so the gap shows up in the record
+instead of disappearing into "no pattern".
 
 At least one assigned pattern must have `.clears == True` to proceed. If none clears, this is
 the day's **nearest miss** if it came closest — record it, move to the next name.
 
 **2c. §11 scoring** — assign the eight `engine.scoring.ScoreSheet` dimensions from the
-evidence gathered so far (Stage A's mechanism/kill-switch evidence, this session's pattern
-confirmation, and — for `option_implementation` specifically — a preliminary read of the
-chain's liquidity, not a separate impression). Call `engine.scoring.aggregate_score` with
+evidence gathered so far (Stage A's mechanism/kill-switch evidence and this session's pattern
+confirmation). Two of them are no longer impressions (ADR 0021):
+
+- **`option_implementation`**: one preliminary chain read of the best strike in the regime's
+  delta band (§13.1) at the nearest expiration in the 365–900 DTE range. Build
+  `engine.gates.LiquidityVetoInputs` from its quote and call
+  `engine.scoring.option_implementation_score(cfg, evaluate_liquidity_vetoes(cfg, inputs),
+  spread_pct=..., open_interest=...)`. Use that number as is. It is 10 (the sub-gate minimum)
+  exactly when the DTE, spread, open-interest and volume vetoes all pass.
+- **`invalidation_clarity`**: 5 when the name's `kill_switch` names numeric thresholds (M2's come
+  from `kill_switch_thresholds.M2` in config). Below 5 only for a specific, named gap in how the
+  thesis would be measured. An unexplained drop belongs in `mispricing`, not here. Call `engine.scoring.aggregate_score` with
 `effective_threshold` from step 1's macro read (`RestrictedRegimeResult.score_threshold`).
 A failing sub-gate or a below-threshold total ends this name's screen for today.
 
@@ -308,15 +341,29 @@ reach for it just because IV looks high.
 from real comparable-cohort dispersion once `state/calibration.json` has enough entries) →
 `robust_kelly_fraction` → `nav_caps` (reading `is_calibrated` from whether this
 mechanism/structure has ≥50 entries in `state/calibration.json`) → `compute_f_trade` →
-`compute_feasibility`. **If infeasible, report `min_feasible_nav` — never a bare reject.**
-Log this candidate to `state/calibration.json` regardless of feasibility; that is the point of
-the paper ledger (ADR 0013).
+`compute_feasibility(f_trade, nav, p0, calibrated_cap_pct=caps_pct_of_nav[structure_type])`.
+Read `is_calibrated` from `engine.ledger.is_calibrated(entries, mechanism, structure_type, cfg)`,
+which counts **closed** entries only. **If infeasible, report `min_feasible_nav`,
+`min_feasible_nav_calibrated` and `contract_pct_of_nav`, never a bare reject.**
+
+Log the candidate to `state/calibration.json` regardless of feasibility; that is the point of
+the paper ledger (ADR 0013). One entry per episode (ADR 0021): if
+`engine.ledger.open_entry(entries, ticker)` returns an entry, call `engine.ledger.reconfirm`
+on it instead of appending a new one. A name that clears on consecutive days is one
+observation, not several. A new entry carries `contract_expiration`, `strike` and
+`option_type` as separate fields as well as the `contract` string, so `weekly-review` can mark
+it, plus `marks: []` and `realized_outcome: null`. Don't write `nav_at_run` into this file: NAV
+is never stored on disk (ADR 0013), and `contract_pct_of_nav` says what matters.
 
 **3f. Portfolio risk (§15).** Only meaningfully binding once real positions exist —
 `engine.portfolio.evaluate_portfolio_risk` against the book with and without this candidate.
 With an empty book this trivially passes; say so rather than skipping the check silently.
 
-A name that clears every step above is a `CANDIDATE`. Everything else is `NO TRADE` for that
+A name that clears every step above is a `CANDIDATE`. A name that clears everything except
+§13.3 feasibility is a **paper candidate**: say so by name in the notification, with its score,
+contract, `contract_pct_of_nav` and `min_feasible_nav_calibrated`, e.g. `Paper candidate: MU
+(Micron Technology) 81/80, Jan-2028 $600C, one contract = 100% of NAV, needs $3.0M NAV even after
+calibration`. It is the most useful line the run produces. Everything else is `NO TRADE` for that
 name today, with the specific gate or threshold that stopped it recorded (§18 requires naming
 it). Record each name's `mechanism` (copied straight from `state/watchlist.json`, not
 re-derived) alongside its result — Phase 7's public sanitizer tags every published name by
@@ -358,12 +405,13 @@ Write `daily/YYYY-MM-DD.json` (including the `screener_feed` block), write
 
 ## Cost discipline
 
-- Never re-fetch what's already cached upstream: mechanism evidence and kill-switch status come
-  from `weekly-review`; NTM revisions and the macro regime come from `macro-refresh`. Neither is
-  this skill's to refresh. Note that these have **different owners** — a stale `ntm` field or a
-  stale `macro-latest.json` is fixed by `macro-refresh` (desktop-only), *not* by `weekly-review`,
-  which is egress-blocked from both sources and can only read them. Flag staleness per §1a and
-  move on; waiting for `weekly-review` to fix it would wait forever.
+- Never re-fetch what's already cached upstream: mechanism evidence, kill-switch status and
+  `pattern_inputs` come from `weekly-review`; NTM revisions and the macro regime come from the
+  macro-refresh GitHub Action. Neither is this skill's to refresh. A stale `ntm` field or a stale
+  `macro-latest.json` means the Action failed. `weekly-review` can't fix it either. Flag staleness
+  per §1a and move on.
+- Keep the run note and per-name text short. A record that restates the skill's rules costs
+  tokens every day and is read by no one: give the numbers and the gate that stopped each name.
 - Gate before you spend a chain call — §7 and §10 are cheap (quotes, historicals, earnings
   dates); §12's chain pull is the expensive step per name. A name killed at 2a or 2b costs zero
   option-chain calls.

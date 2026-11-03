@@ -32,6 +32,26 @@ def pct_change(values: Sequence[float], lag: int) -> float:
     return (values[-1] / base - 1) * 100.0
 
 
+def is_range_bound(values: Sequence[float], window: int, max_band_pct: float) -> bool:
+    """True when the trailing `window` values' high-low band, as a % of the
+    low, is no wider than `max_band_pct`. Quiet inflection's "remains
+    range-bound" (§10), made mechanical (ADR 0021)."""
+    if len(values) < window:
+        raise ValueError(f"need >= {window} values, got {len(values)}")
+    tail = values[-window:]
+    lo = min(tail)
+    if lo <= 0:
+        raise ValueError("non-positive value in window")
+    return (max(tail) / lo - 1) * 100.0 <= max_band_pct
+
+
+def value_on_or_before(series: Sequence[tuple[str, float]], iso_date: str) -> float | None:
+    """The latest value dated on or before `iso_date` in a (date, value)
+    series, or None if every observation is later."""
+    candidates = [v for d, v in sorted(series) if d <= iso_date]
+    return candidates[-1] if candidates else None
+
+
 def daily_returns(values: Sequence[float]) -> list[float]:
     """Day-over-day returns as fractions (e.g. -0.05, not -5.0)."""
     return [values[i] / values[i - 1] - 1 for i in range(1, len(values)) if values[i - 1] != 0]

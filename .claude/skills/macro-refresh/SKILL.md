@@ -1,9 +1,22 @@
 ---
 name: macro-refresh
-description: Desktop-only refresh of macro hard-gate state, the R throttle, and NTM estimate revisions — the one piece of Stage A that cannot run in a cloud routine. Use for "refresh macro state", "run macro-refresh", or when weekly-review's cloud output flags stale macro/NTM data.
+description: Refresh macro hard-gate state, the R throttle, NTM estimate revisions and the NYSE breadth list. A GitHub Action now does everything except the NYSE list unattended (ADR 0021); use this skill for that list, or by hand when the Action has failed. Use for "refresh macro state", "run macro-refresh", "refresh the NYSE list", or when a run flags stale macro/NTM data.
 ---
 
-# Macro Refresh (framework v7, desktop-only — split out of weekly-review 2026-09-04)
+# Macro Refresh (framework v7 — split out of weekly-review 2026-09-04)
+
+**Since ADR 0021 this runs unattended as a GitHub Action** in the data repo
+(`.github/workflows/macro-refresh.yml`): weekdays at 14:00 UTC and Sundays at 13:30 UTC. It runs
+`scripts/macro_refresh.py`, which carries out steps 1, 1a, 2 and 3 below with the same engine
+calls. The desktop scheduled task that used to do this stalled on permission prompts (the
+2026-10-18 and 2026-10-25 runs stopped at their first command and wrote nothing), so it's gone.
+
+Use this skill by hand for two things only:
+- **Step 1b, the NYSE breadth list.** It needs Massive, a desktop extension. Monthly is plenty:
+  the list moves a handful of names a month and is only read when breadth is needed.
+- **A failed Action.** Check the Action's run log first. Fixing the script is better than
+  running around it. If you have to, run
+  `python -m scripts.macro_refresh --data <data-repo>` from the public repo's root, then commit.
 
 **Why this exists as its own skill, not part of `weekly-review`:** a 2026-09-04 diagnostic
 (`docs/decisions/0014-macro-fetch-desktop-only.md`) confirmed FRED, Alpha Vantage, and
@@ -147,7 +160,6 @@ but never attempts the fetch itself.
 
 ## Cadence
 
-Run this whenever convenient, at least weekly, ideally right before (or same-day as) the next
-`weekly-review` cloud run so its kill-switch/S8 work has fresh NTM context. There is no harm in
-running it more often — Alpha Vantage's rate limit is the only real constraint, and it's paced
-within this skill already.
+The Action covers steps 1–3 every weekday and Sunday. Run step 1b by hand about monthly. Alpha
+Vantage's free tier allows 25 calls a day and the Action uses one per watchlist name, so avoid
+running the NTM step by hand on a day the Action already has.

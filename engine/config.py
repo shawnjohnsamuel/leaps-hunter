@@ -6,8 +6,9 @@ config.example.yaml is an extraction of §20 from framework/v7.md — it
 exists for tests and as a template; if §20 changes, re-extract it. It differs
 from §20 in deliberate places, all project settings the spec never defined:
 `macro_hard_gates.equity_deleveraging.breadth_min_coverage` (ADR 0016), the
-`tripwires` block (ADR 0017), the `macro_staleness` block (ADR 0018) and the
-`screener_feed` block (ADR 0020). v7.md itself stays verbatim, so re-extracting
+`tripwires` block (ADR 0017), the `macro_staleness` block (ADR 0018), the
+`screener_feed` block (ADR 0020), and ADR 0021's `kill_switch_thresholds` and
+`calibration` blocks, quiet-inflection lookbacks and lower open-interest floor. v7.md itself stays verbatim, so re-extracting
 must carry all of them forward. The deployed file (state/config.yaml
 in the private data repo, added in Phase 4) is a copy of this template plus
 two additions: portfolio.account_ref, naming which Robinhood account to

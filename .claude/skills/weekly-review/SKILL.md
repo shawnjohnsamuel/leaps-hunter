@@ -13,20 +13,15 @@ a threshold in prose. If anything here disagrees with `v7.md` or `state/config.y
 **Cadence:** weekly, before the first `daily-screen` session of the week. **Discovery happens
 here, never in `daily-screen`** (§4.2) — this is the primary defense against overtrading.
 
-**This skill is cloud-safe and reads macro/NTM state; it never fetches it.** The macro refresh
-and the Alpha Vantage NTM refresh are a separate skill, **`macro-refresh`**, run from a desktop
-session — FRED, Alpha Vantage, and multpl.com are unreachable from a cloud routine (confirmed
-2026-09-04, `docs/decisions/0014-macro-fetch-desktop-only.md`).
+**This skill is cloud-safe and reads macro/NTM state; it never fetches it.** FRED, Alpha
+Vantage and multpl.com are unreachable from a cloud routine (ADR 0014). Since ADR 0021 the
+refresh runs as a **GitHub Action in the data repo** (`.github/workflows/macro-refresh.yml`,
+which runs `scripts/macro_refresh.py`), every weekday at 14:00 UTC and on Sunday at 13:30 UTC,
+before this skill. It replaced the desktop scheduled task, which stalled on permission prompts
+and let the state go 16 days stale in October.
 
-**Ordering: run `macro-refresh` *after* this skill, and before the week's first `daily-screen`.**
-This skill's own use of macro/NTM state is informational — it reads the values and notes them,
-but every decision it makes (kill switches, §8, pattern assignment, retirement/admission) is
-company-specific and macro-independent, so running on a few-day-old read costs it nothing. The
-routine that genuinely needs fresh state is **`daily-screen`**, which scores against
-`restricted_regime.score_threshold` and each name's `ntm` field. And this skill can *admit* new
-names, which have no `ntm` at all until the next `macro-refresh` — so refreshing afterward is
-what closes that gap in the same cycle rather than a week later. Sunday evening (after this
-skill's Sunday run, before Monday's screen) is the intended slot.
+A name this review *admits* has no `ntm` until the Action's next run, normally the next
+weekday morning, which is before the next `daily-screen`. Nothing needs to be run by hand.
 
 ## Setup
 
@@ -50,7 +45,7 @@ field, **not `as_of`** (ADR 0018). Act on the returned `.band`:
 - **`current`** — use it as-is for the regime check below.
 - **`flag`** or **`stop`** — still use it (never block the whole run on this), but flag it
   prominently and near the top of your output:
-  `⚠️ MACRO STATE STALE (last refreshed <date>, <n> days) — run macro-refresh`. This is the
+  `⚠️ MACRO STATE STALE (last refreshed <date>, <n> days) — the macro-refresh GitHub Action is failing, check its runs`. This is the
   same "flag loudly, don't fabricate, don't halt" pattern `bench-check` uses. Unlike
   `daily-screen`, a `stop` band does not halt this skill: nothing here sizes or enters a
   position, and a structural review on two-week-old macro is still worth having.
@@ -77,7 +72,16 @@ evidence:
 - **M1** — did 2+ major customers cut next-12mo capex guidance ≥10%? Has backlog growth
   decelerated across 2 consecutive reports with management confirming normalization?
 - **M2** — do 2 consecutive reports show material ARR/revenue deceleration, pricing pressure,
-  or AI-usage loss without a credible offset?
+  or AI-usage loss without a credible offset? "Material" is a number now (ADR 0021):
+  `kill_switch_thresholds.M2` in config — YoY revenue or ARR growth down by at least
+  `growth_decel_pp_per_report` points versus the prior report, for `consecutive_reports`
+  reports in a row.
+
+**Every name's `kill_switch` text must name its numeric thresholds** (M1's 10% capex cut and two
+reports, M2's config numbers above, M3's named metric and level). §11's `invalidation_clarity`
+has a minimum of 5 out of 5, and through 2026-11-03 M2 names kept scoring 4 there because their
+kill switch said "material" without a number. Rewrite any entry that doesn't meet this the next
+time you touch it.
 - **M3** — has system-of-record status been lost, is strategic customer migration confirmed,
   or has the "temporary" issue become persistent in bookings/retention/pricing/cash flow?
 
@@ -112,10 +116,9 @@ approved proxy, it is `s8_status: "fail"` for the narrative-reversal class, not 
 ## 4. Estimate-revision refresh (§10 patterns 2 & 3) — READ ONLY in a cloud run
 
 **Do not call Alpha Vantage from a cloud routine** — `www.alphavantage.co` is blocked by the
-same egress policy as §1 (confirmed 2026-09-04). This refresh now lives in the **`macro-refresh`**
-skill, run from a desktop session. Here, just read each name's cached `ntm` field from
-`state/watchlist.json` and use its `as_of` date the same way §1 uses `macro-latest.json`'s —
-flag prominently if stale, never re-fetch, never fabricate a revision figure.
+same egress policy as §1. The macro-refresh GitHub Action writes each name's `ntm` field. Here,
+just read it and check its `as_of` (written since ADR 0021): flag prominently if it is more than
+5 trading days old (§3), never re-fetch, never fabricate a revision figure.
 
 ## 5. Entry-pattern assignment (§10) and invalidation rules (§16)
 
@@ -125,6 +128,50 @@ not which currently qualify (that's `daily-screen`'s job). M1 names never get
 `docs/storage-schema-v7.md` for the reasoning already applied to the seed watchlist.
 Predefine §16's invalidation criteria, catalyst timetable, and profit/roll policy per name
 **before** any entry, not after.
+
+## 5a. Cached pattern inputs (ADR 0021)
+
+Through 2026-11-03 only §10's panic pattern had ever cleared. The other three were never
+evaluated, because their judgment inputs were never supplied, and a missing input fails
+closed. Those inputs come from filings, change at most once a quarter, and belong here, not in a
+daily run. For every active name, keep a `pattern_inputs` block in its `state/watchlist.json`
+entry, for the patterns it is assigned:
+
+```json
+"sector_etf": "IGV",
+"pattern_inputs": {
+  "as_of_filing": "10-Q 2026-09-30 (filed 2026-10-28)",
+  "quiet_inflection": {
+    "accelerating_metrics_count": 2,
+    "accelerating_metrics": ["revenue", "operating_margin"],
+    "basis": "[FACT] YoY growth for each of the last three quarters, from get_sec_filing_facts"
+  },
+  "bottleneck_expansion": {
+    "backlog_vs_revenue_growth_pts": 18.0,
+    "backlog_to_revenue_stable_or_rising": true,
+    "pricing_or_margin_evidence": true,
+    "basis": "[FACT] RPO/backlog vs revenue YoY growth, the smaller of the last two reports"
+  }
+}
+```
+
+- **`accelerating_metrics_count`** counts how many of {revenue, cRPO/bookings, FCF, gross margin,
+  operating margin} accelerated versus the prior two quarters (§10). Use reported YoY figures
+  from Robinhood's `get_sec_filing_facts`. A metric the company doesn't disclose doesn't count.
+- **`backlog_vs_revenue_growth_pts`** is backlog (or RPO, or orders) YoY growth minus revenue YoY
+  growth, taken as the **smaller** of the last two reports, since §10 requires both.
+  `backlog_to_revenue_stable_or_rising` compares the backlog/revenue ratio across those two
+  reports. `pricing_or_margin_evidence` is true only with a dated `[FACT]`: a price increase,
+  or rising gross or incremental margin.
+- **`sector_etf`** is the name's sector benchmark for quiet inflection's relative-underperformance
+  check (for example IGV for software, SMH for semiconductors, XLU for utilities, XLI for
+  industrials, VNQ for REITs).
+- **Refresh only when a new 10-Q or 10-K has been filed** since `as_of_filing`. Otherwise carry
+  the block forward unchanged. That keeps this step to a few names a week, mostly during earnings
+  season.
+- Leave out a field you can't establish from filings rather than guessing. `daily-screen` treats
+  a missing field as unresolved. Never write `option_valuation_passed`: that check is §12's, and
+  runs in `daily-screen`.
 
 ## 6. Retirement and universe admission
 
@@ -209,11 +256,31 @@ Known traps in the feed's sources:
 "screener_feed"` and `"feed_sources": [...]`, copied from the item's `sources`. Names admitted
 any other way carry no `admitted_via` field.
 
+## 8. Paper-ledger marks (§17, ADR 0021)
+
+`state/calibration.json` only counts toward lifting §17's 0.25%-of-NAV cap once entries close,
+and before ADR 0021 nothing ever closed one. For every entry with `realized_outcome: null`
+and no `duplicate_of`:
+
+1. Look up the logged contract (`contract_expiration`, `strike`, `option_type`; older entries
+   carry only the `contract` string, e.g. `"2028-01-21 $600 call"`) with `get_option_instruments`
+   and `get_option_quotes`. Mark it with `engine.ledger.mark(entry, today, bid)`, the bid being
+   what a paper exit would actually get. If there's no quote, mark `bid: None` with a note. Never
+   estimate one.
+2. Close it with `engine.ledger.close(entry, today, reason)` if `engine.ledger.due_to_close` is
+   true (`reason: "horizon"`), or if this review fired the name's §9 kill switch
+   (`reason: "kill_switch"`). Close at the latest priced mark. `close` refuses if there isn't
+   one, and that's correct.
+
+This skill writes only `marks` and `realized_outcome` in that file. `daily-screen` appends the
+entries.
+
 ## Output
 
 Write `weekly/YYYY-MM-DD.json` (see `docs/storage-schema-v7.md`), update `state/watchlist.json`
-in place (kill-switch results, §8 verdicts, pattern assignments, retirements/admissions —
-never the `ntm` field, which only `macro-refresh` writes), and commit + push in the data repo:
+in place (kill-switch results, §8 verdicts, pattern assignments, `pattern_inputs`,
+retirements/admissions — never the `ntm` field, which only the macro-refresh Action writes),
+update `state/calibration.json`'s marks (§8 above), and commit + push in the data repo:
 `git add -A && git commit -m "weekly review YYYY-MM-DD: <one-line summary>" && git push`.
 Do not touch `state/macro-latest.json` or `state/nyse-constituents.json` at all — `macro-refresh`
 owns every key in the macro file except `hard_gates.equity_deleveraging` and `breadth`, which

@@ -173,9 +173,13 @@ class FeasibilityResult:
     n_max: int
     feasible: bool
     min_feasible_nav: float
+    # ADR 0021 diagnostics, so a rejection says how far off it is, not only that it failed:
+    contract_pct_of_nav: float | None = None        # one contract's premium as % of NAV
+    min_feasible_nav_calibrated: float | None = None  # same structure once §17 calibration lifts the cap
 
 
-def compute_feasibility(f_trade: float, nav: float, entry_price_per_share: float) -> FeasibilityResult:
+def compute_feasibility(f_trade: float, nav: float, entry_price_per_share: float,
+                        calibrated_cap_pct: float | None = None) -> FeasibilityResult:
     """N_max = floor(f_trade*NAV / (100*P0_entry)) (§13.3). `entry_price_per_share`
     is the per-share premium (e.g. 79.79 for CRM's Jan-2028 $230 call, from
     engine.optmodel.executable_entry) — the ×100 contracts multiplier is
@@ -185,9 +189,20 @@ def compute_feasibility(f_trade: float, nav: float, entry_price_per_share: float
     `min_feasible_nav` (ADR 0013) is the NAV at which N_max would just reach
     1: 100*P0_entry/f_trade. Every rejection can report exactly what it
     would take rather than a bare reject, and the figure rescales itself
-    automatically as f_trade changes with calibration or regime."""
+    automatically as f_trade changes with calibration or regime.
+
+    `calibrated_cap_pct` (the structure's `caps_pct_of_nav` entry, e.g. 1.25)
+    adds `min_feasible_nav_calibrated`: the NAV one contract needs once the
+    unvalidated-setup cap no longer applies. `contract_pct_of_nav` is the
+    single-position loss one contract represents at today's NAV — the cap
+    that would have been needed (ADR 0021)."""
+    pct = (100 * entry_price_per_share / nav * 100.0) if nav > 0 and entry_price_per_share > 0 else None
+    cal = (100 * entry_price_per_share / (calibrated_cap_pct / 100.0)
+           if calibrated_cap_pct and entry_price_per_share > 0 else None)
     if f_trade <= 0 or entry_price_per_share <= 0:
-        return FeasibilityResult(n_max=0, feasible=False, min_feasible_nav=float("inf"))
+        return FeasibilityResult(n_max=0, feasible=False, min_feasible_nav=float("inf"),
+                                 contract_pct_of_nav=pct, min_feasible_nav_calibrated=cal)
     n_max = math.floor(f_trade * nav / (100 * entry_price_per_share))
     min_nav = (100 * entry_price_per_share) / f_trade
-    return FeasibilityResult(n_max=n_max, feasible=n_max >= 1, min_feasible_nav=min_nav)
+    return FeasibilityResult(n_max=n_max, feasible=n_max >= 1, min_feasible_nav=min_nav,
+                             contract_pct_of_nav=pct, min_feasible_nav_calibrated=cal)

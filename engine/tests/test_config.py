@@ -84,7 +84,7 @@ class ConfigTemplateTests(unittest.TestCase):
 
     def test_option_vetoes(self):
         self.assertEqual(get(self.cfg, "option_vetoes.dte_range"), [365, 900])
-        self.assertEqual(get(self.cfg, "option_vetoes.open_interest_min"), 500)
+        self.assertEqual(get(self.cfg, "option_vetoes.open_interest_min"), 250)  # ADR 0021
         self.assertEqual(get(self.cfg, "option_vetoes.quoted_spread_max_pct"), 6)
 
     def test_acceptance(self):

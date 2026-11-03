@@ -91,3 +91,33 @@ def aggregate_score(cfg: dict, sheet: ScoreSheet, effective_threshold: int) -> S
         passes_sub_gates=all(g.passed for g in sub_gates),
         passes_threshold=total >= effective_threshold,
     )
+
+
+
+def option_implementation_score(cfg: dict, checks, spread_pct: float | None = None,
+                                open_interest: int | None = None) -> int:
+    """§11's option_implementation dimension (15 points, minimum 10), computed
+    from the preliminary chain read's `engine.gates` checks rather than an
+    impression (ADR 0021). The same thin chain was scored anywhere from 3 to 7
+    on different days through 2026-11-03, and this was the most common S11
+    sub-gate failure.
+
+    `checks` is what `evaluate_liquidity_vetoes` returns (any subset that
+    includes the four hard vetoes). All four passing (`dte_range`,
+    `quoted_spread`, `open_interest`, `volume_20d_median`) meets the
+    sub-gate minimum of 10, and each one failing costs 3 below that. Above
+    10: +2 for a spread at most half the ceiling, +2 for open interest at
+    least twice the floor, +1 for a passed `iv_local_outlier` check."""
+    by_name = {c.name: c for c in checks}
+    hard = ["dte_range", "quoted_spread", "open_interest", "volume_20d_median"]
+    failed = sum(1 for n in hard if not (n in by_name and by_name[n].passed))
+    if failed:
+        return max(0, 10 - 3 * failed)
+    score = 10
+    if spread_pct is not None and spread_pct <= get(cfg, "option_vetoes.quoted_spread_max_pct") / 2:
+        score += 2
+    if open_interest is not None and open_interest >= 2 * get(cfg, "option_vetoes.open_interest_min"):
+        score += 2
+    if "iv_local_outlier" in by_name and by_name["iv_local_outlier"].passed:
+        score += 1
+    return score
