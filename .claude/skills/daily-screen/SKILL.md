@@ -383,7 +383,20 @@ is true, report what the same clear means as shares. Call
 `engine.sizing.share_fallback(cfg, spot, probs, moves, kelly_multiplier, nav)`, where `spot` is
 the live share price and `probs` / `moves` are the §12.3 scenarios' probabilities and underlying
 price changes. They're the same ones the LEAP was priced on, so the share case can't use a better
-story. If `passes_acceptance` is true, the name is a **share candidate**. Record the result as
+story. Pass the risk already on, so correlated clears don't stack:
+
+- **Held positions.** `engine.sizing.existing_share_risk(holdings, watchlist["names"],
+  calibration_entries, cfg, nav)`, with `holdings` the configured account's
+  `get_equity_positions` as `{symbol: quantity × last price}`. It returns `by_mechanism` and
+  `total`. Pass `existing_mechanism_loss_pct=by_mechanism.get(mechanism, 0)` and
+  `existing_total_loss_pct=total`.
+- **Same-day candidates.** When several names reach 3e.2 in one run, size them in descending
+  §11 score order, and add each one's `loss_at_worst_pct_nav` to both running totals before
+  sizing the next. Five names cleared the panic pattern together on 2026-11-03.
+
+The result's `binding` names whichever limit set the size: `kelly`, `max_loss_cap` (per
+position), `mechanism_cap`, `total_cap` or `no_edge`. A budget already used up gives
+`dollars: 0` with that cap named. Say so rather than calling it a share candidate. If `passes_acceptance` is true, the name is a **share candidate**. Record the result as
 `share_fallback` in the name's daily JSON entry (every field of the result, plus `spot` and the
 quote time) and on its `state/calibration.json` entry, so `weekly-review` can mark both
 vehicles. If it fails acceptance, say which test failed. The `fail_category` stays
@@ -401,8 +414,8 @@ example:
 
 `SHARE CANDIDATE: MU (Micron Technology) 81/80. LEAP Jan-2028 $600C infeasible (one contract =
 100% of NAV; $3.0M NAV even after calibration); spread not evaluated (option_level_2). As
-shares at $833.59: $314 (0.38 sh), -$94 (0.25% of NAV) in the bear case (-30%), §16 review
-below $583.51. Sized by the loss cap; the risk model alone would allow 12.5% of NAV.`
+shares at $833.59: $2,511 (3.01 sh), -$753 (2% of NAV) in the bear case (-30%), §16 review
+below $583.51. Sized by the per-position cap; the risk model alone would allow 12.5% of NAV.`
 
 That line is the most useful thing the run produces. Keep the binding limit in it, because it
 tells the user which setting is shaping the number. Everything else is `NO TRADE` for that

@@ -234,17 +234,23 @@ class ShareFallbackResult:
 
 def share_fallback(cfg: dict, spot: float, probs: list[float], moves: list[float],
                    kelly_multiplier: float, nav: float, n_draws: int | None = None,
-                   seed: int | None = None) -> ShareFallbackResult:
+                   seed: int | None = None, existing_mechanism_loss_pct: float = 0.0,
+                   existing_total_loss_pct: float = 0.0) -> ShareFallbackResult:
     """Size shares from the candidate's own §12.3 scenarios. `moves` are the
     underlying's price changes per scenario (−0.30 = −30%), the same ones the
     LEAP was priced on, so the share analysis can't use a rosier story.
 
     f_robust is the 10th-percentile Kelly fraction over posterior draws
     (§14), capped at 1.0 because shares here are never bought on margin.
-    The position is min(kelly_multiplier × f_robust, the max-loss cap), where
-    the cap is `share_fallback.max_loss_pct_nav` of NAV lost at the worst
-    scenario. Acceptance is §12.3's: EV above `acceptance.ev_net_min`,
-    EV/EL at least `acceptance.ev_to_expected_loss_min`, positive log growth."""
+    The position is min(kelly_multiplier × f_robust, the loss budget), where
+    the budget is the smallest of three, all in % of NAV lost at the worst
+    scenario: `max_loss_pct_nav` for this position, what's left of
+    `max_loss_pct_nav_per_mechanism` after `existing_mechanism_loss_pct`, and
+    what's left of `max_loss_pct_nav_total` after `existing_total_loss_pct`
+    (see `existing_share_risk`). Clears cluster in a sector selloff, so the
+    last two keep several correlated positions from stacking up.
+    Acceptance is §12.3's: EV above `acceptance.ev_net_min`, EV/EL at least
+    `acceptance.ev_to_expected_loss_min`, positive log growth."""
     if spot <= 0 or nav <= 0:
         raise ValueError("spot and NAV must be positive")
     draws = generate_posterior_draws(probs, moves, n_draws or get(cfg, "sizing.kelly_posterior_draws_min"), seed=seed)
@@ -253,12 +259,20 @@ def share_fallback(cfg: dict, spot: float, probs: list[float], moves: list[float
     ev = sum(p * m for p, m in zip(probs, moves))
     el = sum(p * max(0.0, -m) for p, m in zip(probs, moves))
     ev_to_el = ev / el if el > 0 else None
+    budgets = {
+        "max_loss_cap": get(cfg, "share_fallback.max_loss_pct_nav"),
+        "mechanism_cap": get(cfg, "share_fallback.max_loss_pct_nav_per_mechanism") - existing_mechanism_loss_pct,
+        "total_cap": get(cfg, "share_fallback.max_loss_pct_nav_total") - existing_total_loss_pct,
+    }
+    cap_name, budget_pct = min(budgets.items(), key=lambda kv: kv[1])
     if f_robust <= 0:
         fraction, binding = 0.0, "no_edge"
+    elif budget_pct <= 0:
+        fraction, binding = 0.0, cap_name
     else:
         kelly = kelly_multiplier * f_robust
-        cap = (get(cfg, "share_fallback.max_loss_pct_nav") / 100.0) / -worst if worst < 0 else 1.0
-        fraction, binding = (kelly, "kelly") if kelly <= cap else (cap, "max_loss_cap")
+        cap = (budget_pct / 100.0) / -worst if worst < 0 else 1.0
+        fraction, binding = (kelly, "kelly") if kelly <= cap else (cap, cap_name)
     dollars = fraction * nav
     growth = _kelly_growth(fraction, probs, moves)
     passes = (
@@ -274,3 +288,32 @@ def share_fallback(cfg: dict, spot: float, probs: list[float], moves: list[float
         review_price=round(spot * (1 + worst), 2), ev=ev, ev_to_el=ev_to_el,
         robust_log_growth=growth, passes_acceptance=passes,
     )
+
+
+def existing_share_risk(holdings: dict[str, float], watchlist_names: list[dict],
+                        ledger_entries: list[dict], cfg: dict, nav: float) -> dict:
+    """The share risk already on, for share_fallback's mechanism and total caps.
+
+    `holdings` maps symbol to market value from the configured account's
+    `get_equity_positions`. Only watchlist names count: the caps govern this
+    system's ideas, not the rest of the account. Each holding's loss is its
+    value times its worst move: the one on its open ledger entry's
+    `share_fallback` block if there is one, else
+    `share_fallback.held_worst_move_pct` [ASSUMPTION]. Returns % of NAV lost
+    at the worst case, per mechanism and in total."""
+    mech = {n["ticker"]: n.get("mechanism") for n in watchlist_names}
+    worst = {}
+    for e in ledger_entries:
+        fb = e.get("share_fallback") or {}
+        if e.get("realized_outcome") is None and not e.get("duplicate_of") and fb.get("worst_move") is not None:
+            worst[e["ticker"]] = fb["worst_move"]
+    default = -get(cfg, "share_fallback.held_worst_move_pct") / 100.0
+    by_mech: dict[str, float] = {}
+    total = 0.0
+    for sym, value in holdings.items():
+        if sym not in mech or value <= 0:
+            continue
+        loss_pct = value * -worst.get(sym, default) / nav * 100.0
+        by_mech[mech[sym]] = by_mech.get(mech[sym], 0.0) + loss_pct
+        total += loss_pct
+    return {"by_mechanism": by_mech, "total": total}

@@ -169,10 +169,45 @@ class ShareFallbackTests(unittest.TestCase):
         import copy
         from engine.sizing import share_fallback
         cfg = copy.deepcopy(CFG)
-        cfg["share_fallback"]["max_loss_pct_nav"] = 50
+        for k in ("max_loss_pct_nav", "max_loss_pct_nav_per_mechanism", "max_loss_pct_nav_total"):
+            cfg["share_fallback"][k] = 50
         r = share_fallback(cfg, **self.MU)
         self.assertEqual(r.binding, "kelly")
         self.assertLessEqual(r.fraction_of_nav, 0.125 + 1e-9)  # multiplier x f_robust, f_robust <= 1
+
+    def _cfg(self, per=2.0, mech=3.0, total=8.0):
+        import copy
+        cfg = copy.deepcopy(CFG)
+        cfg["share_fallback"].update(max_loss_pct_nav=per, max_loss_pct_nav_per_mechanism=mech,
+                                     max_loss_pct_nav_total=total)
+        return cfg
+
+    def test_two_percent_per_position_on_mu(self):
+        from engine.sizing import share_fallback
+        r = share_fallback(self._cfg(), **self.MU)
+        self.assertEqual(r.binding, "max_loss_cap")
+        self.assertAlmostEqual(r.loss_at_worst_pct_nav, 2.0, places=2)
+        self.assertAlmostEqual(r.dollars, 37670.62 * 0.02 / 0.30, delta=0.05)
+
+    def test_mechanism_cap_shrinks_a_second_correlated_position(self):
+        from engine.sizing import share_fallback
+        r = share_fallback(self._cfg(), existing_mechanism_loss_pct=2.0, **self.MU)
+        self.assertEqual(r.binding, "mechanism_cap")
+        self.assertAlmostEqual(r.loss_at_worst_pct_nav, 1.0, places=2)
+
+    def test_an_exhausted_budget_sizes_to_zero(self):
+        from engine.sizing import share_fallback
+        r = share_fallback(self._cfg(), existing_total_loss_pct=8.0, **self.MU)
+        self.assertEqual((r.binding, r.dollars), ("total_cap", 0.0))
+
+    def test_existing_share_risk_counts_watchlist_names_only(self):
+        from engine.sizing import existing_share_risk
+        watchlist = [{"ticker": "MU", "mechanism": "M1"}, {"ticker": "SNOW", "mechanism": "M2"}]
+        ledger = [{"ticker": "MU", "realized_outcome": None, "share_fallback": {"worst_move": -0.20}}]
+        r = existing_share_risk({"MU": 2000.0, "SNOW": 1000.0, "AAPL": 9000.0}, watchlist, ledger, CFG, 40000.0)
+        self.assertAlmostEqual(r["by_mechanism"]["M1"], 1.0)   # 2000 x 20% / 40000
+        self.assertAlmostEqual(r["by_mechanism"]["M2"], 0.75)  # 1000 x 30% default / 40000
+        self.assertAlmostEqual(r["total"], 1.75)
 
     def test_no_edge_sizes_to_zero_and_fails_acceptance(self):
         from engine.sizing import share_fallback
