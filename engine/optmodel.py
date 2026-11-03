@@ -164,6 +164,55 @@ def evaluate_delta_policy(
     return DeltaPolicyResult(False, "prohibited", f"{delta} outside all permitted delta bands for the current regime")
 
 
+
+# ---------------------------------------------- vertical spread pricing ---
+# ADR 0022: what §13.2's rule needs as numbers. A spread is evaluated only once
+# the outright is infeasible (§13.3) and the account can hold one (Robinhood
+# options level 3); it is never reached for because IV looks high (§19).
+
+def prob_above(spot: float, strike: float, T: float, r: float, q: float, sigma: float) -> float:
+    """Risk-neutral Pr(S_T > strike) = N(d2). [ASSUMPTION]: §13.2 asks for a
+    "robust" probability without defining one; pass the strike's ask IV,
+    which is higher than the mid and so reads the short strike as likelier to
+    be breached, the conservative direction."""
+    if T <= 0 or sigma <= 0:
+        return 1.0 if spot > strike else 0.0
+    d2 = (math.log(spot / strike) + (r - q - 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
+    return _norm_cdf(d2)
+
+
+def min_short_strike(spot: float, T: float, r: float, q: float, sigma: float, max_prob: float) -> float:
+    """The lowest strike with prob_above <= max_prob: §13.2's condition 4
+    solved for the strike. Round UP to the next listed strike."""
+    lo, hi = spot, spot * 20
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        if prob_above(spot, mid, T, r, q, sigma) > max_prob:
+            lo = mid
+        else:
+            hi = mid
+    return hi
+
+
+def spread_debit(long_ask: float, long_bid: float, short_bid: float, short_ask: float,
+                 fees: float, cfg: dict) -> float:
+    """Executable debit: the long leg at §12.2's entry price, less what the
+    short leg actually collects (its bid less the same slippage). Never mids."""
+    slip = get(cfg, "pricing.entry_slippage_fraction_of_spread")
+    return executable_entry(long_ask, long_bid, fees, cfg) - (short_bid - slip * (short_ask - short_bid))
+
+
+def spread_returns(debit: float, k_long: float, k_short: float, scenario_spots: list[float],
+                   tau_remaining_years: float, r: float, q: float, sigmas: list[float]) -> list[float]:
+    """Each scenario repriced at the horizon: long call minus short call, the
+    same Black-Scholes repricing the outright uses, so the two compare."""
+    out = []
+    for S, sig in zip(scenario_spots, sigmas):
+        value = (bs_call_price(S, k_long, tau_remaining_years, r, q, sig)
+                 - bs_call_price(S, k_short, tau_remaining_years, r, q, sig))
+        out.append((value - debit) / debit)
+    return out
+
 # ------------------------------------------------------- §13.2 spread rule --
 
 def evaluate_spread_rule(

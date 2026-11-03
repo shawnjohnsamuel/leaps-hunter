@@ -8,7 +8,8 @@ from §20 in deliberate places, all project settings the spec never defined:
 `macro_hard_gates.equity_deleveraging.breadth_min_coverage` (ADR 0016), the
 `tripwires` block (ADR 0017), the `macro_staleness` block (ADR 0018), the
 `screener_feed` block (ADR 0020), and ADR 0021's `kill_switch_thresholds` and
-`calibration` blocks, quiet-inflection lookbacks and lower open-interest floor. v7.md itself stays verbatim, so re-extracting
+`calibration` blocks, quiet-inflection lookbacks and lower open-interest floor,
+and ADR 0022's `share_fallback` block. v7.md itself stays verbatim, so re-extracting
 must carry all of them forward. The deployed file (state/config.yaml
 in the private data repo, added in Phase 4) is a copy of this template plus
 two additions: portfolio.account_ref, naming which Robinhood account to

@@ -107,6 +107,14 @@ class SanitizeLeakTests(unittest.TestCase):
         self.assertEqual(len(pub["candidates"]), 1)
         self.assertEqual(pub["candidates"][0]["ticker"], "FAKECO3")
 
+    def test_an_infeasible_s11_clear_is_still_no_trade(self):
+        priv = _base_private(candidates_clearing_s11=1)
+        priv["per_name"] = {"FAKECO3": {"mechanism": "M1", "fail_category": "s14_infeasible",
+                                        "result": "NO TRADE -- infeasible at current NAV"}}
+        pub = sanitize(priv)
+        self.assertEqual(pub["result"], "NO_TRADE")
+        self.assertEqual(pub["candidates"], [])
+
     def test_gates_summary_aggregates_by_fail_category_with_human_readable_labels(self):
         # Public JSON carries GATE_LABELS' relabeled text, not the raw fail_category
         # code -- keeps the artifact self-describing for any consumer, matching

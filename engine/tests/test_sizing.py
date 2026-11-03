@@ -149,5 +149,37 @@ class FeasibilityDiagnosticsTests(unittest.TestCase):
         self.assertIsNone(r.min_feasible_nav_calibrated)
 
 
+
+class ShareFallbackTests(unittest.TestCase):
+    MU = dict(spot=833.59, probs=[0.15, 0.50, 0.25, 0.10], moves=[-0.30, 0.15, 0.45, 0.90],
+              kelly_multiplier=0.125, nav=37670.62, seed=7, n_draws=2000)
+
+    def test_mu_2026_11_03_scenarios_size_to_the_loss_cap(self):
+        from engine.sizing import share_fallback
+        r = share_fallback(CFG, **self.MU)
+        self.assertTrue(r.passes_acceptance)
+        self.assertEqual(r.binding, "max_loss_cap")
+        self.assertAlmostEqual(r.loss_at_worst_pct_nav, 0.25, places=2)  # the configured cap
+        self.assertAlmostEqual(r.dollars, 37670.62 * 0.0025 / 0.30, delta=0.05)
+        self.assertAlmostEqual(r.review_price, 583.51, places=2)
+        self.assertEqual(r.whole_shares, 0)  # fractional only at this size
+        self.assertGreater(r.shares, 0)
+
+    def test_kelly_binds_when_the_cap_is_loose(self):
+        import copy
+        from engine.sizing import share_fallback
+        cfg = copy.deepcopy(CFG)
+        cfg["share_fallback"]["max_loss_pct_nav"] = 50
+        r = share_fallback(cfg, **self.MU)
+        self.assertEqual(r.binding, "kelly")
+        self.assertLessEqual(r.fraction_of_nav, 0.125 + 1e-9)  # multiplier x f_robust, f_robust <= 1
+
+    def test_no_edge_sizes_to_zero_and_fails_acceptance(self):
+        from engine.sizing import share_fallback
+        r = share_fallback(CFG, 100.0, [0.6, 0.4], [-0.2, 0.1], 0.125, 50_000, seed=1, n_draws=500)
+        self.assertEqual(r.dollars, 0.0)
+        self.assertFalse(r.passes_acceptance)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -40,13 +40,21 @@ def reconfirm(entry: dict, today: str, s11_total: int) -> dict:
     return entry
 
 
-def mark(entry: dict, as_of: str, bid: float | None, note: str | None = None) -> dict:
+def mark(entry: dict, as_of: str, bid: float | None, note: str | None = None,
+         share_price: float | None = None) -> dict:
     """Append a mark at the contract's bid (what a paper exit would get).
-    A missing quote is recorded as such, never filled in."""
+    A missing quote is recorded as such, never filled in. `share_price`
+    also tracks the share fallback (ADR 0022) against the entry's
+    `share_fallback.spot`, so each vehicle gets its own record."""
     p0 = entry.get("executable_entry_p0")
     rec = {"date": as_of, "bid": bid}
     if bid is not None and p0:
         rec["return_pct"] = round((bid / p0 - 1) * 100.0, 2)
+    spot0 = (entry.get("share_fallback") or {}).get("spot")
+    if share_price is not None:
+        rec["share_price"] = share_price
+        if spot0:
+            rec["share_return_pct"] = round((share_price / spot0 - 1) * 100.0, 2)
     if note:
         rec["note"] = note
     entry.setdefault("marks", []).append(rec)
@@ -70,6 +78,7 @@ def close(entry: dict, as_of: str, reason: str) -> dict:
         "exit_bid": last["bid"],
         "exit_mark_date": last["date"],
         "return_pct": last.get("return_pct"),
+        "share_return_pct": last.get("share_return_pct"),
         "reason": reason,
     }
     return entry

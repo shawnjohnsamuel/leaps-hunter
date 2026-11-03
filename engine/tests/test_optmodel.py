@@ -1,4 +1,5 @@
 """engine.optmodel — §12 pricing/scenarios and §13.1/13.2 structure rules."""
+import math
 import unittest
 
 from engine.config import TEMPLATE_PATH, load_config
@@ -140,6 +141,30 @@ class SpreadRuleTests(unittest.TestCase):
         checks = evaluate_spread_rule(CFG, None, None, None, None, None, None)
         self.assertFalse(all_passed(checks))
         self.assertEqual(len(failing(checks)), 5)
+
+
+
+class VerticalSpreadTests(unittest.TestCase):
+    def test_prob_above_is_half_near_the_forward_and_falls_with_strike(self):
+        from engine.optmodel import prob_above
+        self.assertGreater(prob_above(100, 90, 1.0, 0.04, 0.0, 0.4), prob_above(100, 130, 1.0, 0.04, 0.0, 0.4))
+        self.assertAlmostEqual(prob_above(100, 100 * math.exp(0.04 - 0.08), 1.0, 0.04, 0.0, 0.4), 0.5, places=6)
+
+    def test_min_short_strike_meets_the_rule_exactly(self):
+        from engine.optmodel import min_short_strike, prob_above
+        k = min_short_strike(164, 1.22, 0.04, 0.0, 0.5, 0.25)
+        self.assertAlmostEqual(prob_above(164, k, 1.22, 0.04, 0.0, 0.5), 0.25, places=4)
+        self.assertGreater(k, 164)
+
+    def test_spread_debit_never_uses_mids(self):
+        from engine.optmodel import spread_debit
+        # long 10.00/10.40, short 3.00/3.20, slippage 0.25 of each spread
+        self.assertAlmostEqual(spread_debit(10.40, 10.00, 3.00, 3.20, 0.0, CFG), 10.50 - 2.95, places=6)
+
+    def test_spread_returns_cap_the_upside(self):
+        from engine.optmodel import spread_returns
+        r = spread_returns(5.0, 100, 110, [200.0], 0.0, 0.04, 0.0, [0.4])
+        self.assertAlmostEqual(r[0], (10.0 - 5.0) / 5.0)
 
 
 if __name__ == "__main__":

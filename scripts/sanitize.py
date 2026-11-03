@@ -107,7 +107,12 @@ def sanitize(priv: dict) -> dict:
     # phrase produced exactly that false positive during testing, 2026-09-04).
     if priv.get("per_name") is None and priv.get("result", "").upper() not in ("HOLIDAY",):
         result = "DATA_INSUFFICIENT"
-    elif priv.get("candidates_clearing_s11", 0) > 0:
+    elif priv.get("candidates_clearing_s11", 0) > 0 and any(
+            isinstance(e, dict) and e.get("fail_category") == "cleared"
+            for e in (priv.get("per_name") or {}).values()):
+        # A name that clears §11 but fails §13.3 feasibility (MU, 2026-11-02) is
+        # still NO TRADE; counting §11 clears published it as a CANDIDATE with an
+        # empty candidates list.
         result = "CANDIDATE"
     else:
         result = (priv.get("result") or "NO TRADE").upper().replace(" ", "_")
