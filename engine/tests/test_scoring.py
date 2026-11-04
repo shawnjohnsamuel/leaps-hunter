@@ -68,7 +68,13 @@ class OptionImplementationScoreTests(unittest.TestCase):
     def test_all_hard_vetoes_passing_meets_the_minimum(self):
         from engine.scoring import option_implementation_score
         checks = [c for c in self._checks() if c.name != "iv_local_outlier"]
-        self.assertEqual(option_implementation_score(CFG, checks, spread_pct=5.0, open_interest=300), 10)
+        self.assertEqual(option_implementation_score(CFG, checks, spread_pct=5.0, open_interest=600), 10)
+
+    def test_missing_volume_no_longer_costs_points(self):
+        # 2026-11-04: MU scored 7 here on volume alone and missed an 80/80 clear (ADR 0023).
+        from engine.scoring import option_implementation_score
+        checks = [c for c in self._checks(volume_20d_median=True) if c.name != "iv_local_outlier"]
+        self.assertEqual(option_implementation_score(CFG, checks, spread_pct=3.71, open_interest=730), 10)
 
     def test_a_deep_cheap_chain_scores_full_marks(self):
         from engine.scoring import option_implementation_score
@@ -82,7 +88,7 @@ class OptionImplementationScoreTests(unittest.TestCase):
     def test_a_missing_hard_check_counts_as_failed(self):
         from engine.gates import GateCheck
         from engine.scoring import option_implementation_score
-        self.assertEqual(option_implementation_score(CFG, [GateCheck("dte_range", True, "")]), 1)
+        self.assertEqual(option_implementation_score(CFG, [GateCheck("dte_range", True, "")]), 4)
 
 
 if __name__ == "__main__":

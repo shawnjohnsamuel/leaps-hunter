@@ -68,7 +68,8 @@ switch names numbers. `kill_switch_thresholds.M2` supplies M2's: growth down at 
 report for 2 reports.
 
 **Open interest (§12.1).** `open_interest_min` 500 → 250. The quoted-spread (6%), quote-age (60s)
-and 20-day-volume (10) vetoes are unchanged.
+and 20-day-volume (10) vetoes are unchanged. *Superseded by [ADR 0023](0023-volume-note-and-open-interest-500.md):
+volume became a note and open interest went back to 500.*
 
 **Paper ledger (§17).** `engine.ledger`: one entry per episode (a re-clear reconfirms the open
 entry), weekly marks at the contract's bid by `weekly-review`, a close at 180 days or on a kill
