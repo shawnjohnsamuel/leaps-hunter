@@ -124,9 +124,21 @@ class LiquidityVetoTests(unittest.TestCase):
         self.assertTrue(open_interest_gate(720, CFG).passed)  # the same CRM contract
         self.assertFalse(open_interest_gate(113, CFG).passed)  # 2026-07 INTU chain, per project history
 
-    def test_volume_gate_unavailable_fails_closed(self):
-        self.assertFalse(volume_gate(None, CFG).passed)
-        self.assertTrue(volume_gate(15, CFG).passed)
+    def test_volume_gate_is_a_note_not_a_veto(self):
+        # ADR 0023: Robinhood has no option volume, and real LEAP volume sits under 10.
+        self.assertTrue(volume_gate(None, CFG).passed)
+        self.assertTrue(volume_gate(1.5, CFG).passed)  # MU 2027-12-17 $650C, 2026-11-04
+        self.assertIn("informational", volume_gate(None, CFG).reason)
+
+    def test_volume_gate_can_be_made_a_veto_again(self):
+        cfg = {**CFG, "option_vetoes": {**CFG["option_vetoes"], "median_daily_volume_20d_is_veto": True}}
+        self.assertFalse(volume_gate(None, cfg).passed)
+        self.assertFalse(volume_gate(3.5, cfg).passed)
+        self.assertTrue(volume_gate(15, cfg).passed)
+
+    def test_open_interest_floor_is_v7s_500(self):
+        self.assertTrue(open_interest_gate(730, CFG).passed)   # MU 2027-12-17 $650C, 2026-11-04
+        self.assertFalse(open_interest_gate(300, CFG).passed)
 
     def test_marketable_limit_gate_needs_both_inputs(self):
         self.assertFalse(marketable_limit_gate(None, 79.0).passed)
@@ -172,7 +184,7 @@ class LiquidityOrchestrationTests(unittest.TestCase):
         names_failing = {c.name for c in failing(checks)}
         self.assertEqual(
             names_failing,
-            {"volume_20d_median", "marketable_limit_fill", "premium_vs_fair_value"},
+            {"marketable_limit_fill", "premium_vs_fair_value"},
         )
 
 

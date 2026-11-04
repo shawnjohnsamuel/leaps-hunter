@@ -163,12 +163,20 @@ def open_interest_gate(open_interest: int, cfg: dict) -> GateCheck:
 
 
 def volume_gate(median_20d_volume: float | None, cfg: dict) -> GateCheck:
+    """ADR 0023: a note, not a veto, unless `median_daily_volume_20d_is_veto`
+    is set. Robinhood's option bars carry no volume, so this failed closed on
+    every name, and deep in-the-money LEAPs trade a few contracts a day anyway
+    (MU's two candidate calls had 20-day medians of 1.5 and 3.5 on 2026-11-04).
+    The open-interest floor, back at v7's 500, carries the liquidity test."""
     min_vol = get(cfg, "option_vetoes.median_daily_volume_20d_min")
+    is_veto = bool(get(cfg, "option_vetoes.median_daily_volume_20d_is_veto", False))
     if median_20d_volume is None:
-        return GateCheck("volume_20d_median", False, "20-day median contract volume unavailable")
-    return GateCheck(
-        "volume_20d_median", median_20d_volume >= min_vol, f"{median_20d_volume} (min {min_vol})"
-    )
+        return GateCheck("volume_20d_median", not is_veto, "20-day median contract volume unavailable"
+                         + ("" if is_veto else " (informational, ADR 0023)"))
+    detail = f"{median_20d_volume} (v7 min {min_vol})"
+    if is_veto:
+        return GateCheck("volume_20d_median", median_20d_volume >= min_vol, detail)
+    return GateCheck("volume_20d_median", True, detail + " (informational, ADR 0023)")
 
 
 def marketable_limit_gate(

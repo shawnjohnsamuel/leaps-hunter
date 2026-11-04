@@ -89,8 +89,9 @@ option_vetoes:
   dte_range: [365, 900]
   quote_age_max_seconds: 60
   quoted_spread_max_pct: 6
-  open_interest_min: 250            # ADR 0021: was 500. Spread, quote age and volume vetoes unchanged.
-  median_daily_volume_20d_min: 10
+  open_interest_min: 500            # v7's floor. ADR 0021 lowered it to 250; ADR 0023 restores it in place of the volume veto.
+  median_daily_volume_20d_min: 10   # reported against, not enforced (ADR 0023)
+  median_daily_volume_20d_is_veto: false
   max_premium_over_fair_value_pct: 10
 
 pricing:

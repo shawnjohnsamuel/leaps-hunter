@@ -2,6 +2,10 @@
 
 
 
+## v7.4 — volume note, open interest 500 (2026-11-04, [ADR 0023](../docs/decisions/0023-volume-note-and-open-interest-500.md))
+§12.1's 20-day volume veto failed every name, because Robinhood's option bars carry no volume, and
+real LEAP volume sits under 10 anyway. It becomes a note, and the open-interest floor goes back to
+v7's 500. MU's 80/80 on 2026-11-04 would have cleared scoring.
 ## v7.3 — share fallback and spread path (2026-11-03, [ADR 0022](../docs/decisions/0022-share-fallback-and-spread-path.md))
 A clear the account can't hold as a LEAP (MU, 2026-11-02/03: one contract ≈ 100% of NAV) now
 reports what it means as shares, sized from the same scenarios and robust Kelly under a

@@ -309,7 +309,9 @@ confirmation). Two of them are no longer impressions (ADR 0021):
   `engine.gates.LiquidityVetoInputs` from its quote and call
   `engine.scoring.option_implementation_score(cfg, evaluate_liquidity_vetoes(cfg, inputs),
   spread_pct=..., open_interest=...)`. Use that number as is. It is 10 (the sub-gate minimum)
-  exactly when the DTE, spread, open-interest and volume vetoes all pass.
+  exactly when the DTE, spread and open-interest vetoes all pass. 20-day volume is a note, not a
+  veto (ADR 0023): Robinhood's option bars carry no volume, so pass `median_20d_volume=None` and
+  record the gate's reason as is. Never estimate volume, and never fail a name on it.
 - **`invalidation_clarity`**: 5 when the name's `kill_switch` names numeric thresholds (M2's come
   from `kill_switch_thresholds.M2` in config). Below 5 only for a specific, named gap in how the
   thesis would be measured. An unexplained drop belongs in `mispricing`, not here. Call `engine.scoring.aggregate_score` with

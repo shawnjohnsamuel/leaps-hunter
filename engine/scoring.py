@@ -103,13 +103,14 @@ def option_implementation_score(cfg: dict, checks, spread_pct: float | None = No
     sub-gate failure.
 
     `checks` is what `evaluate_liquidity_vetoes` returns (any subset that
-    includes the four hard vetoes). All four passing (`dte_range`,
-    `quoted_spread`, `open_interest`, `volume_20d_median`) meets the
-    sub-gate minimum of 10, and each one failing costs 3 below that. Above
+    includes the three hard vetoes). All three passing (`dte_range`,
+    `quoted_spread`, `open_interest`) meets the sub-gate minimum of 10, and
+    each one failing costs 3 below that. Volume is a note, not a veto
+    (ADR 0023). Above
     10: +2 for a spread at most half the ceiling, +2 for open interest at
     least twice the floor, +1 for a passed `iv_local_outlier` check."""
     by_name = {c.name: c for c in checks}
-    hard = ["dte_range", "quoted_spread", "open_interest", "volume_20d_median"]
+    hard = ["dte_range", "quoted_spread", "open_interest"]
     failed = sum(1 for n in hard if not (n in by_name and by_name[n].passed))
     if failed:
         return max(0, 10 - 3 * failed)
