@@ -304,8 +304,11 @@ the day's **nearest miss** if it came closest — record it, move to the next na
 evidence gathered so far (Stage A's mechanism/kill-switch evidence and this session's pattern
 confirmation). Two of them are no longer impressions (ADR 0021):
 
-- **`option_implementation`**: one preliminary chain read of the best strike in the regime's
-  delta band (§13.1) at the nearest expiration in the 365–900 DTE range. Build
+- **`option_implementation`**: a preliminary chain read of the best strike in the regime's
+  delta band (§13.1) at each expiration `engine.gates.leap_expirations_to_check(expirations,
+  today, cfg)` returns: the nearest in the 365–900 DTE range, plus the first January one when
+  that differs (ADR 0024). Keep the read `engine.gates.deepest_open_interest` picks, record
+  both reads, and use the kept expiration for the rest of this name's screen. Build
   `engine.gates.LiquidityVetoInputs` from its quote and call
   `engine.scoring.option_implementation_score(cfg, evaluate_liquidity_vetoes(cfg, inputs),
   spread_pct=..., open_interest=...)`. Use that number as is. It is 10 (the sub-gate minimum)
@@ -320,8 +323,8 @@ A failing sub-gate or a below-threshold total ends this name's screen for today.
 
 ## 3. §12–§15 — only for names that cleared steps 2a–2c
 
-**3a. Pull the live chain.** `get_option_chains` → `get_option_instruments` (DTE 365–900,
-call, near the target delta) → `get_option_quotes`. This is the expensive step — it's why
+**3a. Pull the live chain.** `get_option_chains` → `get_option_instruments` (the expiration
+step 2c kept, call, near the target delta) → `get_option_quotes`. This is the expensive step — it's why
 steps 2a–2c run first.
 
 **3b. §12.1 liquidity vetoes.** `engine.gates.evaluate_liquidity_vetoes`. `modeled_entry_cost`

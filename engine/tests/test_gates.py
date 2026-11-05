@@ -11,12 +11,14 @@ from engine.gates import (
     all_passed,
     binary_event_gate,
     catalyst_duration_gate,
+    deepest_open_interest,
     dte_gate,
     evaluate_liquidity_vetoes,
     evaluate_pre_scoring_gates,
     failing,
     governance_risk_gate,
     iv_local_outlier_gate,
+    leap_expirations_to_check,
     marketable_limit_gate,
     open_interest_gate,
     premium_vs_fair_value_gate,
@@ -162,6 +164,35 @@ class LiquidityVetoTests(unittest.TestCase):
 
     def test_premium_vs_fair_value_exceeds_bound(self):
         self.assertFalse(premium_vs_fair_value_gate(90.0, 75.0, CFG).passed)  # +20%
+
+
+class LeapExpirationTests(unittest.TestCase):
+    # Robinhood's GEV expirations from 2027-06 on, as listed 2026-11-05.
+    EXPS = ["2027-06-17", "2027-09-17", "2027-12-17", "2028-01-21", "2028-12-15", "2029-01-19"]
+
+    def test_checks_the_nearest_and_the_first_january(self):
+        self.assertEqual(leap_expirations_to_check(self.EXPS, "2026-11-05", CFG),
+                         ["2027-12-17", "2028-01-21"])
+
+    def test_nearest_already_january_is_checked_once(self):
+        exps = ["2027-12-17", "2028-01-21", "2029-01-19"]
+        self.assertEqual(leap_expirations_to_check(exps, "2027-01-10", CFG), ["2028-01-21"])
+
+    def test_no_january_in_range_checks_only_the_nearest(self):
+        self.assertEqual(leap_expirations_to_check(["2027-12-17", "2028-06-16"], "2026-11-05", CFG),
+                         ["2027-12-17"])
+
+    def test_nothing_in_range(self):
+        self.assertEqual(leap_expirations_to_check(["2026-12-18", "2027-03-19"], "2026-11-05", CFG), [])
+
+    def test_deepest_open_interest_picks_the_january_read(self):
+        # Zscaler's $150 call, 2026-11-05: 0 open in Dec 2027, 462 in Jan 2028.
+        self.assertEqual(deepest_open_interest([("2027-12-17", 0), ("2028-01-21", 462)]), "2028-01-21")
+
+    def test_deepest_open_interest_tie_and_missing(self):
+        self.assertEqual(deepest_open_interest([("2027-12-17", 50), ("2028-01-21", 50)]), "2027-12-17")
+        self.assertEqual(deepest_open_interest([("2027-12-17", None), ("2028-01-21", 3)]), "2028-01-21")
+        self.assertIsNone(deepest_open_interest([]))
 
 
 class LiquidityOrchestrationTests(unittest.TestCase):

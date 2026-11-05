@@ -2,6 +2,10 @@
 
 
 
+## v7.4.1 — read the January LEAP expiry too (2026-11-05, [ADR 0024](../docs/decisions/0024-check-the-january-leap-expiry.md))
+daily-screen's liquidity read covered only the nearest LEAP expiration (December 2027), where
+open interest was often zero. It now also reads the first January expiration and keeps whichever
+has more open interest. No threshold changes.
 ## v7.4 — volume note, open interest 500 (2026-11-04, [ADR 0023](../docs/decisions/0023-volume-note-and-open-interest-500.md))
 §12.1's 20-day volume veto failed every name, because Robinhood's option bars carry no volume, and
 real LEAP volume sits under 10 anyway. It becomes a note, and the open-interest floor goes back to

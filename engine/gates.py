@@ -12,12 +12,14 @@ fair value from the not-yet-built engine.optmodel) arrive as explicit
 optional inputs. **Every check here returns a definite GateCheck even when
 its inputs are missing — `passed=False` with a reason, never a silent
 pass.** This matches ADR 0004's "unverifiable = undeployable" rule, applied
-to every gate in this module rather than only to liquidity.
+to every gate in this module rather than only to liquidity. The one
+exception is 20-day volume, a note rather than a veto since ADR 0023.
 """
 from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass, field
+from datetime import date
 
 from .config import get
 
@@ -138,6 +140,35 @@ def evaluate_pre_scoring_gates(cfg: dict, inputs: PreScoringGateInputs) -> list[
 def dte_gate(dte_days: int, cfg: dict) -> GateCheck:
     lo, hi = get(cfg, "option_vetoes.dte_range")
     return GateCheck("dte_range", lo <= dte_days <= hi, f"{dte_days}d (need {lo}-{hi}d)")
+
+
+def leap_expirations_to_check(expirations: list[str], today: str, cfg: dict) -> list[str]:
+    """The expirations whose delta-band strike gets a liquidity read: the
+    nearest one in `option_vetoes.dte_range`, plus the first January one in
+    range when that's a different date (ADR 0024). LEAP open interest
+    concentrates in the January contracts. On 2026-11-05 four watchlist
+    names had 0-8 contracts open in Dec 2027 and 29-462 in Jan 2028.
+    Dates are ISO strings; the result is in date order, empty when none fit."""
+    lo, hi = get(cfg, "option_vetoes.dte_range")
+    t = date.fromisoformat(today)
+    in_range = sorted(e for e in set(expirations)
+                      if lo <= (date.fromisoformat(e) - t).days <= hi)
+    if not in_range:
+        return []
+    picks = [in_range[0]]
+    january = next((e for e in in_range if date.fromisoformat(e).month == 1), None)
+    if january and january != in_range[0]:
+        picks.append(january)
+    return picks
+
+
+def deepest_open_interest(reads: list[tuple[str, int | None]]) -> str | None:
+    """Of `(expiration, open_interest)` reads from `leap_expirations_to_check`,
+    the expiration with the most open interest; a tie goes to the earlier
+    date. A read with no open interest figure counts as zero."""
+    if not reads:
+        return None
+    return min(reads, key=lambda r: (-(r[1] or 0), r[0]))[0]
 
 
 def quote_age_gate(quote_age_seconds: float, cfg: dict) -> GateCheck:
